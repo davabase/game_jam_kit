@@ -164,8 +164,8 @@ public:
 
     virtual void init() {
         for (auto& service : services) {
-                service.second->init();
-            }
+            service.second->init();
+        }
         for (auto& game_object : game_objects) {
             game_object->init();
         }
@@ -188,8 +188,8 @@ public:
 
     virtual void draw() {
         for (auto& service : services) {
-                service.second->draw();
-            }
+            service.second->draw();
+        }
         for (auto& game_object : game_objects) {
             game_object->draw();
         }
@@ -226,26 +226,30 @@ public:
     }
 };
 
-struct I2 { int x, y; };
-static inline bool operator==(const I2& a, const I2& b){ return a.x==b.x && a.y==b.y; }
+struct IntVec2 { int x, y; };
+static inline bool operator==(const IntVec2& a, const IntVec2& b){ return a.x==b.x && a.y==b.y; }
 
-struct I2Hash {
-    size_t operator()(const I2& p) const noexcept {
-        return (uint64_t(uint32_t(p.x)) << 32) ^ uint32_t(p.y);
+struct IntVec2Hash {
+    size_t operator()(const IntVec2& p) const noexcept {
+        std::size_t h1 = std::hash<int>{}(p.x);
+        std::size_t h2 = std::hash<int>{}(p.y);
+        return h1 ^ (h2 << 1);
     }
 };
 
 // Undirected edge (a,b) stored canonically (min,max)
 struct Edge {
-    I2 a, b;
+    IntVec2 a, b;
 };
 static inline bool operator==(const Edge& e1, const Edge& e2){
-    return e1.a==e2.a && e1.b==e2.b;
+    return e1.a == e2.a && e1.b == e2.b;
 }
 struct EdgeHash {
     size_t operator()(const Edge& e) const noexcept {
-        I2Hash h;
-        return h(e.a) * 1315423911u ^ h(e.b);
+        IntVec2Hash h;
+        std::size_t h1 = h(e.a);
+        std::size_t h2 = h(e.b);
+        return h1 ^ (h2 << 1);
     }
 };
 
@@ -284,13 +288,13 @@ public:
     };
 
     // Returns true if solid is on RIGHT side of the loop (correct for Box2D chain one-sided)
-    bool loop_has_solid_on_right(const std::vector<I2>& loop_corners, const ldtk::Layer& layer, const ldtk::IntPoint& size, int cell_size, float scale)
+    bool loop_has_solid_on_right(const std::vector<IntVec2>& loop_corners, const ldtk::Layer& layer, const ldtk::IntPoint& size, int cell_size, float scale)
     {
         // pick an edge with non-zero length
         int n = (int)loop_corners.size();
         for (int i = 0; i < n; ++i) {
-            I2 a = loop_corners[i];
-            I2 b = loop_corners[(i + 1) % n];
+            IntVec2 a = loop_corners[i];
+            IntVec2 b = loop_corners[(i + 1) % n];
             int dx = b.x - a.x;
             int dy = b.y - a.y;
             if (dx == 0 && dy == 0) continue;
@@ -397,15 +401,15 @@ public:
             // Create bodies.
             const auto& size = layer.getGridSize();
 
-            auto make_edge = [&](I2 p0, I2 p1) -> Edge {
+            auto make_edge = [&](IntVec2 p0, IntVec2 p1) -> Edge {
                 if (p1.x < p0.x || (p1.x == p0.x && p1.y < p0.y)) std::swap(p0, p1);
                 return {p0, p1};
             };
 
             std::unordered_set<Edge, EdgeHash> edges;
 
-            for (int y = 0; y < size.y; ++y) {
-                for (int x = 0; x < size.x; ++x) {
+            for (int y = 0; y < size.y; y++) {
+                for (int x = 0; x < size.x; x++) {
                     if (!is_solid(layer, x, y, size)) continue;
 
                     // neighbor empty => boundary edge
@@ -416,7 +420,7 @@ public:
                 }
             }
 
-            std::unordered_map<I2, std::vector<I2>, I2Hash> adj;
+            std::unordered_map<IntVec2, std::vector<IntVec2>, IntVec2Hash> adj;
             adj.reserve(edges.size() * 2);
 
             for (auto& e : edges) {
@@ -425,21 +429,21 @@ public:
             }
 
             // Helper to remove an undirected edge from the set as we consume it
-            auto erase_edge = [&](I2 p0, I2 p1){
+            auto erase_edge = [&](IntVec2 p0, IntVec2 p1){
                 edges.erase(make_edge(p0, p1));
             };
 
             // Walk loops
-            std::vector<std::vector<I2>> loops;
+            std::vector<std::vector<IntVec2>> loops;
 
             while (!edges.empty()) {
                 // pick an arbitrary remaining edge
                 Edge startE = *edges.begin();
-                I2 start = startE.a;
-                I2 cur = startE.b;
-                I2 prev = start;
+                IntVec2 start = startE.a;
+                IntVec2 cur = startE.b;
+                IntVec2 prev = start;
 
-                std::vector<I2> poly;
+                std::vector<IntVec2> poly;
                 poly.push_back(start);
                 poly.push_back(cur);
                 erase_edge(start, cur);
@@ -447,10 +451,10 @@ public:
                 while (!(cur == start)) {
                     // choose next neighbor that is not prev and still has an edge remaining
                     const auto& nbs = adj[cur];
-                    I2 next = prev; // fallback
+                    IntVec2 next = prev; // fallback
 
                     bool found = false;
-                    for (const I2& cand : nbs) {
+                    for (const IntVec2& cand : nbs) {
                         if (cand == prev) continue;
                         if (edges.find(make_edge(cur, cand)) != edges.end()) {
                             next = cand;
