@@ -217,6 +217,7 @@ public:
     void init() override {
         b2WorldDef world_def = b2DefaultWorldDef();
         world_def.gravity = gravity;
+        world_def.contactHertz = 120;
         world = b2CreateWorld(&world_def);
     }
 
@@ -489,7 +490,30 @@ public:
                         std::reverse(poly.begin(), poly.end());
                     }
 
-                    loops.push_back(std::move(poly));
+                    // Not really necessary but here we reduce the number of points on a line to just the ends.
+                    std::vector<IntVec2> reduced;
+                    reduced.push_back(poly[0]);
+                    b2Vec2 original_normal = {0, 0};
+                    for (int i = 1; i < poly.size(); i++) {
+                        auto first = poly[i - 1];
+                        auto second = poly[i];
+                        float length = sqrt((second.x - first.x) * (second.x - first.x) + (second.y - first.y) * (second.y - first.y));
+                        b2Vec2 normal = { (second.x - first.x) / length, (second.y - first.y) / length };
+                        if (length == 0) {
+                            normal = {0, 0};
+                        }
+                        if (i == 1) {
+                            original_normal = normal;
+                        }
+
+                        if (normal != original_normal) {
+                            reduced.push_back(first);
+                            original_normal = normal;
+                        }
+
+                    }
+                    reduced.push_back(poly.back());
+                    loops.push_back(std::move(reduced));
                 }
             }
 
@@ -837,6 +861,6 @@ public:
 
     void draw() override {
         Scene::draw();
-        debug.debug_draw(get_service<PhysicsService>()->world);
+        // debug.debug_draw(get_service<PhysicsService>()->world);
     }
 };
