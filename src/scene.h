@@ -2,7 +2,6 @@
 
 #include <assert.h>
 #include <memory>
-#include <set>
 #include <typeindex>
 #include <unordered_map>
 #include <unordered_set>
@@ -36,7 +35,7 @@ class GameObject {
 public:
     Scene* scene = nullptr;
     std::vector<std::unique_ptr<Component>> components;
-    std::set<std::string> tags;
+    std::unordered_set<std::string> tags;
 
     GameObject() = default;
     virtual ~GameObject() = default;
@@ -95,11 +94,14 @@ public:
 class Service {
 public:
     Scene* scene = nullptr;
+    bool is_init = false;
 
     Service() = default;
     virtual ~Service() = default;
 
-    virtual void init() {}
+    virtual void init() {
+        is_init = true;
+    }
     virtual void update() {}
     virtual void draw() {}
 };
@@ -130,7 +132,9 @@ public:
     void add_service(std::unique_ptr<T> service) {
         service->scene = this;
         auto [it, inserted] = services.emplace(std::type_index(typeid(T)), std::move(service));
-        assert(inserted && "Duplicate service added");
+        if (!inserted) {
+            TraceLog(LOG_ERROR, "Duplicate service added: %s", typeid(T).name());
+        }
     }
 
     template <typename T, typename... TArgs>
@@ -146,9 +150,13 @@ public:
     T* get_service() {
         auto it = services.find(std::type_index(typeid(T)));
         if (it != services.end()) {
-            return static_cast<T*>(it->second.get());
+            auto service = it->second.get();
+            if (!service->is_init) {
+                TraceLog(LOG_ERROR, "Service not initialized: %s", typeid(T).name());
+            }
+            return static_cast<T*>(service);
         }
-        assert(false && "Service of requested type not found in scene.");
+        TraceLog(LOG_FATAL, "Service of requested type not found in scene: %s", typeid(T).name());
         return nullptr;
     }
 
@@ -162,10 +170,16 @@ public:
         return tagged_objects;
     }
 
-    virtual void init() {
+    void init_services() {
         for (auto& service : services) {
-            service.second->init();
+            if (!service.second->is_init) {
+                service.second->init();
+            }
         }
+    }
+
+    virtual void init() {
+        init_services();
         for (auto& game_object : game_objects) {
             game_object->init();
         }
@@ -219,6 +233,8 @@ public:
         world_def.gravity = gravity;
         world_def.contactHertz = 120;
         world = b2CreateWorld(&world_def);
+
+        Service::init();
     }
 
     void update() override {
@@ -337,10 +353,91 @@ public:
         return false;
     }
 
+    /**
+     * Get all entities across all layers in the level.
+     *
+     * @return A vector of LDtk entities.
+     */
+    std::vector<const ldtk::Entity*> get_entities() {
+        const auto& world  = project.getWorld();
+        const auto& level  = world.getLevel(level_name);
+        const auto& layers = level.allLayers();
+
+        std::vector<const ldtk::Entity*> entities;
+
+        for (const auto& layer : layers) {
+            const auto& layer_entities = layer.allEntities();
+
+            entities.reserve(entities.size() + layer_entities.size());
+            for (const auto& entity : layer_entities) {
+                entities.push_back(&entity);
+            }
+        }
+
+        return entities;
+}
+
+     std::vector<const ldtk::Entity*> get_entities_by_name(const std::string& name) {
+        // TODO: Check if we loaded a project first.
+        const auto& world = project.getWorld();
+        const auto& level = world.getLevel(level_name);
+        const auto& layers = level.allLayers();
+
+        std::vector<const ldtk::Entity*> entities;
+
+        for (const auto& layer : layers) {
+            const auto& layer_entities = layer.getEntitiesByName(name);
+
+            entities.reserve(entities.size() + layer_entities.size());
+            for (const auto& entity : layer_entities) {
+                entities.push_back(&entity.get());
+            }
+        }
+
+        return entities;
+    }
+
+     std::vector<const ldtk::Entity*> get_entities_by_tag(const std::string& tag) {
+        // TODO: Check if we loaded a project first.
+        const auto& world = project.getWorld();
+        const auto& level = world.getLevel(level_name);
+        const auto& layers = level.allLayers();
+
+        std::vector<const ldtk::Entity*> entities;
+
+        for (const auto& layer : layers) {
+            const auto& layer_entities = layer.getEntitiesByTag(tag);
+
+            entities.reserve(entities.size() + layer_entities.size());
+            for (const auto& entity : layer_entities) {
+                entities.push_back(&entity.get());
+            }
+        }
+
+        return entities;
+    }
+
+    const ldtk::Entity* get_entity_by_name(const std::string& name) {
+        auto entities = get_entities_by_name(name);
+        if (entities.empty()) {
+            return nullptr;
+        }
+
+        return entities[0];
+    }
+
+    const ldtk::Entity* get_entity_by_tag(const std::string& tag) {
+        auto entities = get_entities_by_tag(tag);
+        if (entities.empty()) {
+            return nullptr;
+        }
+
+        return entities[0];
+    }
+
     void init() override {
         if (!FileExists(project_file.c_str())) {
-            TraceLog(LOG_ERROR, "LDtk file not found: %s", project_file.c_str());
-            assert(false);
+            TraceLog(LOG_FATAL, "LDtk file not found: %s", project_file.c_str());
         }
         project.loadFromFile(project_file);
         const auto& world = project.getWorld();
@@ -354,8 +451,7 @@ public:
             }
         }
         if (!found) {
-            TraceLog(LOG_ERROR, "LDtk level not found: %s", level_name.c_str());
-            assert(false);
+            TraceLog(LOG_FATAL, "LDtk level not found: %s", level_name.c_str());
         }
 
         const auto& level = world.getLevel(level_name);
@@ -363,19 +459,21 @@ public:
 
         // Loop through all layers and create textures and collisions bodies.
         for (auto& layer : layers) {
-            const auto& tiles_vector = layer.allTiles();
+            if (!layer.hasTileset()) {
+                continue;
+            }
 
             // Load the texture and the renderer.
             auto directory = std::string(GetDirectoryPath(project_file.c_str()));
             auto tileset_file = directory + "/" + layer.getTileset().path;
             if (!FileExists(tileset_file.c_str())) {
-                TraceLog(LOG_ERROR, "Tileset file not found: %s", tileset_file.c_str());
-                assert(false);
+                TraceLog(LOG_FATAL, "Tileset file not found: %s", tileset_file.c_str());
             }
             Texture2D texture = LoadTexture(tileset_file.c_str());
             RenderTexture2D renderer = LoadRenderTexture(level.size.x, level.size.y);
 
             // Draw all the tiles.
+            const auto& tiles_vector = layer.allTiles();
             BeginTextureMode(renderer);
             ClearBackground(MAGENTA);
             for (const auto &tile : tiles_vector) {
@@ -556,7 +654,8 @@ public:
                 layer_bodies.push_back(layer_body);
             }
         }
-        return;
+
+        Service::init();
     }
 
     void draw() override {
@@ -583,6 +682,7 @@ public:
     b2BodyId body = b2_nullBodyId;
     float x, y, width, height;
 
+    // TODO: Make the position the center of the the box like with the dynamic box.
     StaticBox(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
 
     void init() override {
@@ -654,6 +754,10 @@ struct CharacterParams {
     float width_px = 24.0f;
     float height_px = 40.0f;
 
+    // Initial position in pixels
+    float position_x = 0.0f;
+    float position_y = 0.0f;
+
     // Movement
     float max_speed_px_s = 220.0f;
     float accel_px_s2 = 2000.0f;
@@ -704,7 +808,7 @@ public:
         body_def.isBullet = true;
         body_def.linearDamping = 0.0f;
         body_def.angularDamping = 0.0f;
-        body_def.position = b2Vec2{400, 300} * pixels_to_meters;
+        body_def.position = b2Vec2{p.position_x, p.position_y} * pixels_to_meters;
         body = b2CreateBody(world, &body_def);
 
         b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
@@ -848,11 +952,31 @@ public:
         std::vector<std::string> collision_names = {"walls"};
         add_service<LDtkService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
 
+        init_services();
+
+        auto level = get_service<LDtkService>();
+        auto player_entity = level->get_entity_by_name("Player");
+        if (!player_entity) {
+            assert(false);
+        }
+        auto box_entity = level->get_entity_by_tag("box");
+        if (!box_entity) {
+            assert(false);
+        }
+
+        CharacterParams params;
+        params.position_x = player_entity->getPosition().x * level->scale;
+        params.position_y = player_entity->getPosition().y * level->scale;
+
+        auto character = add_game_object<Character>(params);
+        character->add_tag("character");
+
+        auto box = add_game_object<DynamicBox>(box_entity->getPosition().x * level->scale, box_entity->getPosition().y * level->scale,
+                                               box_entity->getSize().x * level->scale, box_entity->getSize().y * level->scale, 46.0f);
+
+
         auto ground = add_game_object<StaticBox>(0.0f, 575.0f, 800.0f, 25.0f);
         ground->add_tag("ground");
-        auto box = add_game_object<DynamicBox>(200.0f, 300.0f, 50.0f, 50.0f, 46.0f);
-        auto character = add_game_object<Character>(CharacterParams{});
-        character->add_tag("character");
 
         debug.init();
 
