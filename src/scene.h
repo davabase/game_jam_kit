@@ -241,6 +241,15 @@ public:
         if (!b2World_IsValid(world)) return;
         b2World_Step(world, time_step, sub_steps);
     }
+
+    Vector2 convert_to_pixels(b2Vec2 meters) const {
+        const auto converted = meters * meters_to_pixels;
+        return {converted.x, converted.y};
+    }
+
+    b2Vec2 convert_to_meters(Vector2 pixels) const {
+        return {pixels.x * pixels_to_meters, pixels.y * pixels_to_meters};
+    }
 };
 
 struct IntVec2 { int x, y; };
@@ -291,148 +300,6 @@ public:
         for (auto& body : layer_bodies) {
             b2DestroyBody(body);
         }
-    }
-
-    bool is_solid(const ldtk::Layer& layer, int x, int y, const ldtk::IntPoint& size) {
-        if (x < 0 || y < 0 || x >= size.x || y >= size.y) return false;
-        std::string name = layer.getIntGridVal(x, y).name;
-        for (const auto& collision_name : collision_names) {
-            if (name == collision_name) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    // Returns true if solid is on RIGHT side of the loop (correct for Box2D chain one-sided)
-    bool loop_has_solid_on_right(const std::vector<IntVec2>& loop_corners, const ldtk::Layer& layer, const ldtk::IntPoint& size, int cell_size, float scale)
-    {
-        // pick an edge with non-zero length
-        int n = (int)loop_corners.size();
-        for (int i = 0; i < n; ++i) {
-            IntVec2 a = loop_corners[i];
-            IntVec2 b = loop_corners[(i + 1) % n];
-            int dx = b.x - a.x;
-            int dy = b.y - a.y;
-            if (dx == 0 && dy == 0) continue;
-
-            // Convert corner coords to pixel coords (scaled)
-            float ax = a.x * cell_size * scale;
-            float ay = a.y * cell_size * scale;
-            float bx = b.x * cell_size * scale;
-            float by = b.y * cell_size * scale;
-
-            // edge direction
-            float ex = bx - ax;
-            float ey = by - ay;
-            float len = std::sqrt(ex*ex + ey*ey);
-            if (len < 1e-4f) continue;
-            ex /= len; ey /= len;
-
-            // right normal = (-ey, ex)
-            float rx = -ey;
-            float ry = ex;
-
-            // midpoint of the edge
-            float mx = 0.5f * (ax + bx);
-            float my = 0.5f * (ay + by);
-
-            // sample a point slightly to the right
-            float eps = 0.25f * cell_size * scale; // quarter-tile in pixels (scaled)
-            float sx = mx + rx * eps;
-            float sy = my + ry * eps;
-
-            // map sample pixel -> grid cell
-            int gx = (int)std::floor(sx / (cell_size * scale));
-            int gy = (int)std::floor(sy / (cell_size * scale));
-
-            return is_solid(layer, gx, gy, size);
-        }
-
-        // Fallback: if degenerate, say false
-        return false;
-    }
-
-    /**
-     * Get all entities across all layers in the level.
-     *
-     * @return A vector of LDtk entities.
-     */
-    std::vector<const ldtk::Entity*> get_entities() {
-        const auto& world  = project.getWorld();
-        const auto& level  = world.getLevel(level_name);
-        const auto& layers = level.allLayers();
-
-        std::vector<const ldtk::Entity*> entities;
-
-        for (const auto& layer : layers) {
-            const auto& layer_entities = layer.allEntities();
-
-            entities.reserve(entities.size() + layer_entities.size());
-            for (const auto& entity : layer_entities) {
-                entities.push_back(&entity);
-            }
-        }
-
-        return entities;
-}
-
-     std::vector<const ldtk::Entity*> get_entities_by_name(const std::string& name) {
-        // TODO: Check if we loaded a project first.
-        const auto& world = project.getWorld();
-        const auto& level = world.getLevel(level_name);
-        const auto& layers = level.allLayers();
-
-        std::vector<const ldtk::Entity*> entities;
-
-        for (const auto& layer : layers) {
-            const auto& layer_entities = layer.getEntitiesByName(name);
-
-            entities.reserve(entities.size() + layer_entities.size());
-            for (const auto& entity : layer_entities) {
-                entities.push_back(&entity.get());
-            }
-        }
-
-        return entities;
-    }
-
-     std::vector<const ldtk::Entity*> get_entities_by_tag(const std::string& tag) {
-        // TODO: Check if we loaded a project first.
-        const auto& world = project.getWorld();
-        const auto& level = world.getLevel(level_name);
-        const auto& layers = level.allLayers();
-
-        std::vector<const ldtk::Entity*> entities;
-
-        for (const auto& layer : layers) {
-            const auto& layer_entities = layer.getEntitiesByTag(tag);
-
-            entities.reserve(entities.size() + layer_entities.size());
-            for (const auto& entity : layer_entities) {
-                entities.push_back(&entity.get());
-            }
-        }
-
-        return entities;
-    }
-
-    const ldtk::Entity* get_entity_by_name(const std::string& name) {
-        auto entities = get_entities_by_name(name);
-        if (entities.empty()) {
-            return nullptr;
-        }
-
-        return entities[0];
-    }
-
-    const ldtk::Entity* get_entity_by_tag(const std::string& tag) {
-        auto entities = get_entities_by_tag(tag);
-        if (entities.empty()) {
-            return nullptr;
-        }
-
-        return entities[0];
     }
 
     void init() override {
@@ -584,7 +451,7 @@ public:
                 // Only keep valid chains
                 if (poly.size() >= 3) {
                     // If we're not solid on the right, then we wrapped the wrong way.
-                    if (!loop_has_solid_on_right(poly, layer, size, layer.getCellSize(), scale)) {
+                    if (!loop_has_solid_on_right(poly, layer)) {
                         std::reverse(poly.begin(), poly.end());
                     }
 
@@ -617,9 +484,6 @@ public:
 
             auto physics = scene->get_service<PhysicsService>();
 
-            int cell = layer.getCellSize();
-            float s = scale;
-
             b2BodyDef bd = b2DefaultBodyDef();
             bd.type = b2_staticBody;
             bd.position = {0,0};
@@ -630,8 +494,8 @@ public:
                 verts.reserve(loop.size());
 
                 for (auto& p : loop) {
-                    float xpx = p.x * cell * s;
-                    float ypx = p.y * cell * s;
+                    float xpx = p.x * layer.getCellSize() * scale;
+                    float ypx = p.y * layer.getCellSize() * scale;
                     verts.push_back({ xpx * physics->pixels_to_meters, ypx * physics->pixels_to_meters });
                 }
 
@@ -675,6 +539,168 @@ public:
             DrawTexturePro(renderer.texture, src, dest, {0}, .0f, WHITE);
         }
     }
+
+    bool is_solid(const ldtk::Layer& layer, int x, int y, const ldtk::IntPoint& size) {
+        if (x < 0 || y < 0 || x >= size.x || y >= size.y) return false;
+        std::string name = layer.getIntGridVal(x, y).name;
+        for (const auto& collision_name : collision_names) {
+            if (name == collision_name) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // Returns true if solid is on RIGHT side of the loop (correct for Box2D chain one-sided)
+    bool loop_has_solid_on_right(const std::vector<IntVec2>& loop_corners, const ldtk::Layer& layer) {
+        const int cell_size = layer.getCellSize();
+
+        // pick an edge with non-zero length
+        int n = (int)loop_corners.size();
+        for (int i = 0; i < n; ++i) {
+            IntVec2 a = loop_corners[i];
+            IntVec2 b = loop_corners[(i + 1) % n];
+            int dx = b.x - a.x;
+            int dy = b.y - a.y;
+            if (dx == 0 && dy == 0) continue;
+
+            // Convert corner coords to pixel coords (scaled)
+            float ax = a.x * cell_size * scale;
+            float ay = a.y * cell_size * scale;
+            float bx = b.x * cell_size * scale;
+            float by = b.y * cell_size * scale;
+
+            // edge direction
+            float ex = bx - ax;
+            float ey = by - ay;
+            float len = std::sqrt(ex*ex + ey*ey);
+            if (len < 1e-4f) continue;
+            ex /= len; ey /= len;
+
+            // right normal = (-ey, ex)
+            float rx = -ey;
+            float ry = ex;
+
+            // midpoint of the edge
+            float mx = 0.5f * (ax + bx);
+            float my = 0.5f * (ay + by);
+
+            // sample a point slightly to the right
+            float eps = 0.25f * cell_size * scale; // quarter-tile in pixels (scaled)
+            float sx = mx + rx * eps;
+            float sy = my + ry * eps;
+
+            // map sample pixel -> grid cell
+            int gx = (int)std::floor(sx / (cell_size * scale));
+            int gy = (int)std::floor(sy / (cell_size * scale));
+
+            return is_solid(layer, gx, gy, layer.getGridSize());
+        }
+
+        // Fallback: if degenerate, say false
+        return false;
+    }
+
+    /**
+     * Get all entities across all layers in the level.
+     *
+     * @return A vector of LDtk entities.
+     */
+    std::vector<const ldtk::Entity*> get_entities() {
+        const auto& world  = project.getWorld();
+        const auto& level  = world.getLevel(level_name);
+        const auto& layers = level.allLayers();
+
+        std::vector<const ldtk::Entity*> entities;
+
+        for (const auto& layer : layers) {
+            const auto& layer_entities = layer.allEntities();
+
+            entities.reserve(entities.size() + layer_entities.size());
+            for (const auto& entity : layer_entities) {
+                entities.push_back(&entity);
+            }
+        }
+
+        return entities;
+}
+
+     std::vector<const ldtk::Entity*> get_entities_by_name(const std::string& name) {
+        // TODO: Check if we loaded a project first.
+        const auto& world = project.getWorld();
+        const auto& level = world.getLevel(level_name);
+        const auto& layers = level.allLayers();
+
+        std::vector<const ldtk::Entity*> entities;
+
+        for (const auto& layer : layers) {
+            const auto& layer_entities = layer.getEntitiesByName(name);
+
+            entities.reserve(entities.size() + layer_entities.size());
+            for (const auto& entity : layer_entities) {
+                entities.push_back(&entity.get());
+            }
+        }
+
+        return entities;
+    }
+
+     std::vector<const ldtk::Entity*> get_entities_by_tag(const std::string& tag) {
+        // TODO: Check if we loaded a project first.
+        const auto& world = project.getWorld();
+        const auto& level = world.getLevel(level_name);
+        const auto& layers = level.allLayers();
+
+        std::vector<const ldtk::Entity*> entities;
+
+        for (const auto& layer : layers) {
+            const auto& layer_entities = layer.getEntitiesByTag(tag);
+
+            entities.reserve(entities.size() + layer_entities.size());
+            for (const auto& entity : layer_entities) {
+                entities.push_back(&entity.get());
+            }
+        }
+
+        return entities;
+    }
+
+    const ldtk::Entity* get_entity_by_name(const std::string& name) {
+        auto entities = get_entities_by_name(name);
+        if (entities.empty()) {
+            return nullptr;
+        }
+
+        return entities[0];
+    }
+
+    const ldtk::Entity* get_entity_by_tag(const std::string& tag) {
+        auto entities = get_entities_by_tag(tag);
+        if (entities.empty()) {
+            return nullptr;
+        }
+
+        return entities[0];
+    }
+
+    Vector2 convert_to_pixels(const ldtk::IntPoint& point) const {
+        return {point.x * scale, point.y * scale};
+    }
+
+    b2Vec2 convert_to_meters(const ldtk::IntPoint& point) const {
+        auto physics = scene->get_service<PhysicsService>();
+        physics->convert_to_meters(convert_to_pixels(point));
+    }
+
+    ldtk::IntPoint convert_to_grid(const Vector2& pixels) const {
+        return {static_cast<int>(pixels.x / scale), static_cast<int>(pixels.y / scale)};
+    }
+
+    ldtk::IntPoint convert_to_grid(const b2Vec2& meters) const {
+        auto physics = scene->get_service<PhysicsService>();
+        auto pixels = physics->convert_to_pixels(meters);
+        return {static_cast<int>(pixels.x / scale), static_cast<int>(pixels.y / scale)};
+    }
 };
 
 class StaticBox : public GameObject {
@@ -712,6 +738,9 @@ public:
 
     DynamicBox(float x, float y, float width, float height, float rotation = 0)
         : x(x), y(y), width(width), height(height), rot_deg(rotation) {}
+
+    DynamicBox(Vector2 position, Vector2 size, float rotation = 0)
+        : x(position.x), y(position.y), width(size.x), height(size.y), rot_deg(rotation) {}
 
     void init() override {
         auto physics = scene->get_service<PhysicsService>();
@@ -755,8 +784,7 @@ struct CharacterParams {
     float height_px = 40.0f;
 
     // Initial position in pixels
-    float position_x = 0.0f;
-    float position_y = 0.0f;
+    Vector2 position;
 
     // Movement
     float max_speed_px_s = 220.0f;
@@ -808,7 +836,7 @@ public:
         body_def.isBullet = true;
         body_def.linearDamping = 0.0f;
         body_def.angularDamping = 0.0f;
-        body_def.position = b2Vec2{p.position_x, p.position_y} * pixels_to_meters;
+        body_def.position = physics->convert_to_meters(p.position);
         body = b2CreateBody(world, &body_def);
 
         b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
@@ -943,6 +971,23 @@ public:
     }
 };
 
+class CameraObject : public GameObject {
+public:
+    Camera2D camera;
+
+    void init() override {
+        GameObject::init();
+    }
+
+    void draw_begin() {
+        BeginMode2D(camera);
+    }
+
+    void draw_end() {
+        EndMode2D();
+    }
+};
+
 class Playground : public Scene {
 public:
     DebugRenderer debug;
@@ -965,26 +1010,43 @@ public:
         }
 
         CharacterParams params;
-        params.position_x = player_entity->getPosition().x * level->scale;
-        params.position_y = player_entity->getPosition().y * level->scale;
-
+        params.position = level->convert_to_pixels(player_entity->getPosition());
         auto character = add_game_object<Character>(params);
         character->add_tag("character");
 
-        auto box = add_game_object<DynamicBox>(box_entity->getPosition().x * level->scale, box_entity->getPosition().y * level->scale,
-                                               box_entity->getSize().x * level->scale, box_entity->getSize().y * level->scale, 46.0f);
+        auto position = level->convert_to_pixels(box_entity->getPosition());
+        auto size = level->convert_to_pixels(box_entity->getSize());
+        auto box = add_game_object<DynamicBox>(position, size, 46.0f);
 
 
         auto ground = add_game_object<StaticBox>(0.0f, 575.0f, 800.0f, 25.0f);
         ground->add_tag("ground");
+
+        auto camera = add_game_object<CameraObject>();
+        camera->add_tag("camera");
+        camera->camera.zoom = 1;
+        camera->camera.offset = {400, 300};
+        camera->camera.rotation = 0;
 
         debug.init();
 
         Scene::init();
     }
 
+    void update(float delta_time) override {
+        auto camera = dynamic_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
+        auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
+        auto physics = get_service<PhysicsService>();
+        camera->camera.target = physics->convert_to_pixels(b2Body_GetPosition(player->body));
+
+        Scene::update(delta_time);
+    }
+
     void draw() override {
+        auto camera = dynamic_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
+        camera->draw_begin();
         Scene::draw();
         // debug.debug_draw(get_service<PhysicsService>()->world);
+        camera->draw_end();
     }
 };

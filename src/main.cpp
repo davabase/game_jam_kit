@@ -27,9 +27,9 @@ void update() {
 
 int main(int argc, char** argv) {
     // Initialize the window
-    const int screenWidth = 800;
-    const int screenHeight = 600;
-    InitWindow(screenWidth, screenHeight, "Game Jam Kit");
+    const int screen_width = 800;
+    const int screen_height = 600;
+    InitWindow(screen_width, screen_height, "Game Jam Kit");
     SetTargetFPS(60);
 
     scene.init();
