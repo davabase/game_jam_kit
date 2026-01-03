@@ -252,11 +252,8 @@ public:
     }
 };
 
-struct IntVec2 { int x, y; };
-static inline bool operator==(const IntVec2& a, const IntVec2& b){ return a.x==b.x && a.y==b.y; }
-
-struct IntVec2Hash {
-    size_t operator()(const IntVec2& p) const noexcept {
+struct IntPointHash {
+    size_t operator()(const ldtk::IntPoint& p) const noexcept {
         std::size_t h1 = std::hash<int>{}(p.x);
         std::size_t h2 = std::hash<int>{}(p.y);
         return h1 ^ (h2 << 1);
@@ -265,14 +262,14 @@ struct IntVec2Hash {
 
 // Undirected edge (a,b) stored canonically (min,max)
 struct Edge {
-    IntVec2 a, b;
+    ldtk::IntPoint a, b;
 };
 static inline bool operator==(const Edge& e1, const Edge& e2){
     return e1.a == e2.a && e1.b == e2.b;
 }
 struct EdgeHash {
     size_t operator()(const Edge& e) const noexcept {
-        IntVec2Hash h;
+        IntPointHash h;
         std::size_t h1 = h(e.a);
         std::size_t h2 = h(e.b);
         return h1 ^ (h2 << 1);
@@ -367,7 +364,7 @@ public:
             // Create bodies.
             const auto& size = layer.getGridSize();
 
-            auto make_edge = [&](IntVec2 p0, IntVec2 p1) -> Edge {
+            auto make_edge = [&](ldtk::IntPoint p0, ldtk::IntPoint p1) -> Edge {
                 if (p1.x < p0.x || (p1.x == p0.x && p1.y < p0.y)) std::swap(p0, p1);
                 return {p0, p1};
             };
@@ -386,7 +383,7 @@ public:
                 }
             }
 
-            std::unordered_map<IntVec2, std::vector<IntVec2>, IntVec2Hash> adj;
+            std::unordered_map<ldtk::IntPoint, std::vector<ldtk::IntPoint>, IntPointHash> adj;
             adj.reserve(edges.size() * 2);
 
             for (auto& e : edges) {
@@ -395,21 +392,21 @@ public:
             }
 
             // Helper to remove an undirected edge from the set as we consume it
-            auto erase_edge = [&](IntVec2 p0, IntVec2 p1){
+            auto erase_edge = [&](ldtk::IntPoint p0, ldtk::IntPoint p1){
                 edges.erase(make_edge(p0, p1));
             };
 
             // Walk loops
-            std::vector<std::vector<IntVec2>> loops;
+            std::vector<std::vector<ldtk::IntPoint>> loops;
 
             while (!edges.empty()) {
                 // pick an arbitrary remaining edge
                 Edge startE = *edges.begin();
-                IntVec2 start = startE.a;
-                IntVec2 cur = startE.b;
-                IntVec2 prev = start;
+                ldtk::IntPoint start = startE.a;
+                ldtk::IntPoint cur = startE.b;
+                ldtk::IntPoint prev = start;
 
-                std::vector<IntVec2> poly;
+                std::vector<ldtk::IntPoint> poly;
                 poly.push_back(start);
                 poly.push_back(cur);
                 erase_edge(start, cur);
@@ -417,10 +414,10 @@ public:
                 while (!(cur == start)) {
                     // choose next neighbor that is not prev and still has an edge remaining
                     const auto& nbs = adj[cur];
-                    IntVec2 next = prev; // fallback
+                    ldtk::IntPoint next = prev; // fallback
 
                     bool found = false;
-                    for (const IntVec2& cand : nbs) {
+                    for (const ldtk::IntPoint& cand : nbs) {
                         if (cand == prev) continue;
                         if (edges.find(make_edge(cur, cand)) != edges.end()) {
                             next = cand;
@@ -456,7 +453,7 @@ public:
                     }
 
                     // Not really necessary but here we reduce the number of points on a line to just the ends.
-                    std::vector<IntVec2> reduced;
+                    std::vector<ldtk::IntPoint> reduced;
                     reduced.push_back(poly[0]);
                     b2Vec2 original_normal = {0, 0};
                     for (int i = 1; i < poly.size(); i++) {
@@ -552,14 +549,14 @@ public:
     };
 
     // Returns true if solid is on RIGHT side of the loop (correct for Box2D chain one-sided)
-    bool loop_has_solid_on_right(const std::vector<IntVec2>& loop_corners, const ldtk::Layer& layer) {
+    bool loop_has_solid_on_right(const std::vector<ldtk::IntPoint>& loop_corners, const ldtk::Layer& layer) {
         const int cell_size = layer.getCellSize();
 
         // pick an edge with non-zero length
         int n = (int)loop_corners.size();
         for (int i = 0; i < n; ++i) {
-            IntVec2 a = loop_corners[i];
-            IntVec2 b = loop_corners[(i + 1) % n];
+            ldtk::IntPoint a = loop_corners[i];
+            ldtk::IntPoint b = loop_corners[(i + 1) % n];
             int dx = b.x - a.x;
             int dy = b.y - a.y;
             if (dx == 0 && dy == 0) continue;
