@@ -369,6 +369,8 @@ public:
     std::vector<b2BodyId> layer_bodies;
     float scale = 4.0f;
 
+    PhysicsService* physics;
+
     LDtkService(std::string project_file, std::string level_name, std::vector<std::string> collision_names, float scale = 4.0f) :
         project_file(project_file), level_name(level_name), collision_names(collision_names), scale(scale) {}
 
@@ -402,6 +404,8 @@ public:
         if (!found) {
             TraceLog(LOG_FATAL, "LDtk level not found: %s", level_name.c_str());
         }
+
+        physics = scene->get_service<PhysicsService>();
 
         const auto& level = world.getLevel(level_name);
         const auto& layers = level.allLayers();
@@ -564,8 +568,6 @@ public:
                 }
             }
 
-            auto physics = scene->get_service<PhysicsService>();
-
             b2BodyDef bd = b2DefaultBodyDef();
             bd.type = b2_staticBody;
             bd.position = {0,0};
@@ -689,6 +691,10 @@ public:
      * @return A vector of LDtk entities.
      */
     std::vector<const ldtk::Entity*> get_entities() {
+        if (!is_init) {
+            TraceLog(LOG_ERROR, "LDtk project not loaded.");
+            return {};
+        }
         const auto& world  = project.getWorld();
         const auto& level  = world.getLevel(level_name);
         const auto& layers = level.allLayers();
@@ -707,8 +713,11 @@ public:
         return entities;
 }
 
-     std::vector<const ldtk::Entity*> get_entities_by_name(const std::string& name) {
-        // TODO: Check if we loaded a project first.
+    std::vector<const ldtk::Entity*> get_entities_by_name(const std::string& name) {
+        if (!is_init) {
+            TraceLog(LOG_ERROR, "LDtk project not loaded.");
+            return {};
+        }
         const auto& world = project.getWorld();
         const auto& level = world.getLevel(level_name);
         const auto& layers = level.allLayers();
@@ -728,7 +737,10 @@ public:
     }
 
      std::vector<const ldtk::Entity*> get_entities_by_tag(const std::string& tag) {
-        // TODO: Check if we loaded a project first.
+        if (!is_init) {
+            TraceLog(LOG_ERROR, "LDtk project not loaded.");
+            return {};
+        }
         const auto& world = project.getWorld();
         const auto& level = world.getLevel(level_name);
         const auto& layers = level.allLayers();
@@ -770,7 +782,6 @@ public:
     }
 
     b2Vec2 convert_to_meters(const ldtk::IntPoint& point) const {
-        auto physics = scene->get_service<PhysicsService>();
         return physics->convert_to_meters(convert_to_pixels(point));
     }
 
@@ -779,7 +790,6 @@ public:
     }
 
     ldtk::IntPoint convert_to_grid(const b2Vec2& meters) const {
-        auto physics = scene->get_service<PhysicsService>();
         auto pixels = physics->convert_to_pixels(meters);
         return {static_cast<int>(pixels.x / scale), static_cast<int>(pixels.y / scale)};
     }
@@ -790,7 +800,6 @@ public:
     b2BodyId body = b2_nullBodyId;
     float x, y, width, height;
 
-    // TODO: Make the position the center of the the box like with the dynamic box.
     StaticBox(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
 
     void init() override {
@@ -800,7 +809,7 @@ public:
 
         b2BodyDef body_def = b2DefaultBodyDef();
         body_def.type = b2_staticBody;
-        body_def.position = b2Vec2{(x + width / 2.0f) * pixels_to_meters, (y + height / 2.0f) * pixels_to_meters};
+        body_def.position = b2Vec2{x * pixels_to_meters, y * pixels_to_meters};
         body = b2CreateBody(world, &body_def);
 
         b2Polygon body_polygon = b2MakeBox(width / 2.0f * pixels_to_meters, height / 2.0f * pixels_to_meters);
@@ -811,7 +820,7 @@ public:
     }
 
     void draw() override {
-        DrawRectangle(x, y, width, height, RED);
+        DrawRectangle(x - width / 2.0f, y - height / 2.0f, width, height, RED);
     }
 };
 
@@ -819,6 +828,7 @@ class DynamicBox : public GameObject {
 public:
     b2BodyId body = b2_nullBodyId;
     float x, y, width, height, rot_deg;
+    PhysicsService* physics;
 
     DynamicBox(float x, float y, float width, float height, float rotation = 0)
         : x(x), y(y), width(width), height(height), rot_deg(rotation) {}
@@ -827,7 +837,7 @@ public:
         : x(position.x), y(position.y), width(size.x), height(size.y), rot_deg(rotation) {}
 
     void init() override {
-        auto physics = scene->get_service<PhysicsService>();
+        physics = scene->get_service<PhysicsService>();
         const float pixels_to_meters = physics->pixels_to_meters;
         auto world = physics->world;
 
@@ -849,8 +859,6 @@ public:
     }
 
     void draw() override {
-        // TODO: Move all get_service calls to init and save a reference to the service for use later.
-        auto physics = scene->get_service<PhysicsService>();
         float meters_to_pixels = physics->meters_to_pixels;
         b2Vec2 pos = b2Body_GetPosition(body);
         b2Rot rot = b2Body_GetRotation(body);
@@ -909,10 +917,12 @@ public:
     float coyote_timer = 0.0f;
     float jump_buffer_timer = 0.0f;
 
+    PhysicsService* physics;
+
     Character(CharacterParams p) : p(p) {}
 
     void init() override {
-        auto physics = scene->get_service<PhysicsService>();
+        physics = scene->get_service<PhysicsService>();
         const float pixels_to_meters = physics->pixels_to_meters;
         auto world = physics->world;
 
@@ -957,7 +967,6 @@ public:
         const bool jump_pressed = IsKeyPressed(KEY_W);
         const bool jump_held = IsKeyDown(KEY_W);
 
-        auto physics = scene->get_service<PhysicsService>();
         const float meters_to_pixels = physics->meters_to_pixels;
         const float pixels_to_meters = physics->pixels_to_meters;
         const b2WorldId world = physics->world;
@@ -1103,7 +1112,7 @@ public:
         auto box = add_game_object<DynamicBox>(position, size, 46.0f);
 
 
-        auto ground = add_game_object<StaticBox>(0.0f, 575.0f, 800.0f, 25.0f);
+        auto ground = add_game_object<StaticBox>(400.0f, 587.5f, 800.0f, 25.0f);
         ground->add_tag("ground");
 
         auto camera = add_game_object<CameraObject>();
