@@ -14,6 +14,11 @@
 #include "debug_draw.h"
 #include "raycasts.h"
 
+// TODO: Write docs with principles. Use get_service, get_game_objects_*, and get_component in init and store references. This way if a service, object, or component does not exist it will cause a crash during init.
+// TODO: Make Manager class, like a global Service that survives across Scenes. Make Scene::init() take map of managers.
+// TODO: Make WindowManager to store window size and init, etc. AudioManager for loading and playing sounds. SpriteManager for loading sprites.
+// TODO: Move prebuilt Components, GameObjects, and Services to prefabs/ folder. Move ECS stuff and raycast helpers to utils/ folder.
+
 // Forward declarations.
 class GameObject;
 class Scene;
@@ -328,7 +333,6 @@ public:
     void set_velocity(Vector2 pixels_per_second) {
         set_velocity(physics->convert_to_meters(pixels_per_second));
     }
-
 };
 
 struct IntPointHash {
