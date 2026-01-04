@@ -34,24 +34,39 @@ public:
 class GameObject {
 public:
     Scene* scene = nullptr;
-    std::vector<std::unique_ptr<Component>> components;
+    std::unordered_map<std::type_index, std::unique_ptr<Component>> components;
     std::unordered_set<std::string> tags;
 
     GameObject() = default;
     virtual ~GameObject() = default;
 
-    void add_component(std::unique_ptr<Component> component) {
+    template <typename T>
+    void add_component(std::unique_ptr<T> component) {
+        static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         component->owner = this;
-        components.push_back(std::move(component));
+        auto [it, inserted] = components.emplace(std::type_index(typeid(T)), std::move(component));
+        if (!inserted) {
+            TraceLog(LOG_ERROR, "Duplicate component added: %s", typeid(T).name());
+        }
     }
 
     template <typename T, typename... TArgs>
     T* add_component(TArgs&&... args) {
         static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
-        auto new_object = std::make_unique<T>(std::forward<TArgs>(args)...);
-        T* object_ptr = new_object.get();
-        add_component(std::move(new_object));
-        return object_ptr;
+        auto new_component = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* component_ptr = new_component.get();
+        add_component<T>(std::move(new_component));
+        return component_ptr;
+    }
+
+    template <typename T>
+    T* get_component() {
+        auto it = components.find(std::type_index(typeid(T)));
+        if (it != components.end()) {
+            auto component = it->second.get();
+            return static_cast<T*>(component);
+        }
+        return nullptr;
     }
 
     void add_tag(const std::string& tag) {
@@ -68,25 +83,25 @@ public:
 
     virtual void init() {
         for (auto& component : components) {
-            component->init();
+            component.second->init();
         }
     }
 
     virtual void load() {
         for (auto& component : components) {
-            component->load();
+            component.second->load();
         }
     }
 
     virtual void update(float delta_time) {
         for (auto& component : components) {
-            component->update();
+            component.second->update();
         }
     }
 
     virtual void draw() {
         for (auto& component : components) {
-            component->draw();
+            component.second->draw();
         }
     }
 };
@@ -250,6 +265,70 @@ public:
     b2Vec2 convert_to_meters(Vector2 pixels) const {
         return {pixels.x * pixels_to_meters, pixels.y * pixels_to_meters};
     }
+
+    float convert_to_pixels(float meters) const {
+        return meters * meters_to_pixels;
+    }
+
+    float convert_to_meters(float pixels) const {
+        return pixels * pixels_to_meters;
+    }
+};
+
+class BodyComponent : public Component {
+public:
+    b2BodyId id = b2_nullBodyId;
+    std::function<void(BodyComponent&)> build;
+    PhysicsService* physics;
+
+    BodyComponent() {}
+    BodyComponent(b2BodyId id) : id(id) {}
+
+    /**
+     * Specify a lambda for creating the physics body which will be called during init.
+     * It is the user's responsibility to assign the body id to id in this function.
+     *
+     * @param build A user provided function for creating a physics body.
+     */
+    BodyComponent(std::function<void(BodyComponent&)> build = {}) : build(std::move(build)) {}
+
+    ~BodyComponent() {
+        if (b2Body_IsValid(id)) {
+            b2DestroyBody(id);
+        }
+    }
+
+    void init() override {
+        physics = owner->scene->get_service<PhysicsService>();
+        if (build) {
+            build(*this);
+        }
+    }
+
+    b2Vec2 get_position_meters() const {
+        return b2Body_GetPosition(id);
+    }
+
+    Vector2 get_position_pixels() const {
+        return physics->convert_to_pixels(get_position_meters());
+    }
+
+    b2Vec2 get_velocity_meters() const {
+        return b2Body_GetLinearVelocity(id);
+    }
+
+    Vector2 get_velocity_pixels() const {
+        return physics->convert_to_pixels(get_velocity_meters());
+    }
+
+    void set_velocity(b2Vec2 meters_per_second) {
+        b2Body_SetLinearVelocity(id, meters_per_second);
+    }
+
+    void set_velocity(Vector2 pixels_per_second) {
+        set_velocity(physics->convert_to_meters(pixels_per_second));
+    }
+
 };
 
 struct IntPointHash {
@@ -295,7 +374,9 @@ public:
         }
 
         for (auto& body : layer_bodies) {
-            b2DestroyBody(body);
+            if (b2Body_IsValid(body)) {
+                b2DestroyBody(body);
+            }
         }
     }
 
@@ -493,7 +574,7 @@ public:
                 for (auto& p : loop) {
                     float xpx = p.x * layer.getCellSize() * scale;
                     float ypx = p.y * layer.getCellSize() * scale;
-                    verts.push_back({ xpx * physics->pixels_to_meters, ypx * physics->pixels_to_meters });
+                    verts.push_back(physics->convert_to_meters({xpx, ypx}));
                 }
 
                 std::vector<b2SurfaceMaterial> mats;
@@ -686,7 +767,7 @@ public:
 
     b2Vec2 convert_to_meters(const ldtk::IntPoint& point) const {
         auto physics = scene->get_service<PhysicsService>();
-        physics->convert_to_meters(convert_to_pixels(point));
+        return physics->convert_to_meters(convert_to_pixels(point));
     }
 
     ldtk::IntPoint convert_to_grid(const Vector2& pixels) const {
@@ -721,6 +802,8 @@ public:
         b2Polygon body_polygon = b2MakeBox(width / 2.0f * pixels_to_meters, height / 2.0f * pixels_to_meters);
         b2ShapeDef box_shape_def = b2DefaultShapeDef();
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
+
+        add_component<BodyComponent>(body);
     }
 
     void draw() override {
@@ -757,9 +840,12 @@ public:
         box_shape_def.density = 1.0f;
         box_shape_def.material = body_material;
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
+
+        add_component<BodyComponent>(body);
     }
 
     void draw() override {
+        // TODO: Move all get_service calls to init and save a reference to the service for use later.
         auto physics = scene->get_service<PhysicsService>();
         float meters_to_pixels = physics->meters_to_pixels;
         b2Vec2 pos = b2Body_GetPosition(body);
@@ -810,9 +896,8 @@ struct CharacterParams {
 
 class Character : public GameObject {
 public:
-    b2BodyId body = b2_nullBodyId;
-
     CharacterParams p;
+    BodyComponent* body;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -827,26 +912,28 @@ public:
         const float pixels_to_meters = physics->pixels_to_meters;
         auto world = physics->world;
 
-        b2BodyDef body_def = b2DefaultBodyDef();
-        body_def.type = b2_dynamicBody;
-        body_def.fixedRotation = true;
-        body_def.isBullet = true;
-        body_def.linearDamping = 0.0f;
-        body_def.angularDamping = 0.0f;
-        body_def.position = physics->convert_to_meters(p.position);
-        body = b2CreateBody(world, &body_def);
+        body = add_component<BodyComponent>([=](BodyComponent& b){
+            b2BodyDef body_def = b2DefaultBodyDef();
+            body_def.type = b2_dynamicBody;
+            body_def.fixedRotation = true;
+            body_def.isBullet = true;
+            body_def.linearDamping = 0.0f;
+            body_def.angularDamping = 0.0f;
+            body_def.position = physics->convert_to_meters(p.position);
+            b.id = b2CreateBody(world, &body_def);
 
-        b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
-        body_material.friction = p.friction;
-        body_material.restitution = p.restitution;
+            b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
+            body_material.friction = p.friction;
+            body_material.restitution = p.restitution;
 
-        b2ShapeDef box_shape_def = b2DefaultShapeDef();
-        box_shape_def.density = p.density;
-        box_shape_def.material = body_material;
+            b2ShapeDef box_shape_def = b2DefaultShapeDef();
+            box_shape_def.density = p.density;
+            box_shape_def.material = body_material;
 
-        // b2Polygon body_polygon = b2MakeBox(p.width_px / 2.0f * pixels_to_meters, p.height_px / 2.0f * pixels_to_meters);
-        b2Polygon body_polygon = b2MakeRoundedBox(p.width_px / 2.0f * pixels_to_meters, p.height_px / 2.0f * pixels_to_meters, 1 * pixels_to_meters);
-        b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
+            // b2Polygon body_polygon = b2MakeBox(p.width_px / 2.0f * pixels_to_meters, p.height_px / 2.0f * pixels_to_meters);
+            b2Polygon body_polygon = b2MakeRoundedBox(p.width_px / 2.0f * pixels_to_meters, p.height_px / 2.0f * pixels_to_meters, 1 * pixels_to_meters);
+            b2CreatePolygonShape(b.id, &box_shape_def, &body_polygon);
+        });
 
         GameObject::init();
     }
@@ -858,7 +945,9 @@ public:
     }
 
     void update(float delta_time) override {
-        if (!b2Body_IsValid(body)) return;
+        if (!b2Body_IsValid(body->id)) {
+            return;
+        }
 
         const float move_x = IsKeyDown(KEY_D) ? 1.0f : (IsKeyDown(KEY_A) ? -1.0f : 0.0f);
         const bool jump_pressed = IsKeyPressed(KEY_W);
@@ -881,24 +970,21 @@ public:
         on_wall_left = false;
         on_wall_right = false;
 
-        b2Vec2 pos = b2Body_GetPosition(body);
-        b2Vec2 v_meters = b2Body_GetLinearVelocity(body);
-        float vx = v_meters.x * meters_to_pixels;
-        float vy = v_meters.y * meters_to_pixels;
-
         // Convert probe distances to meters
         float ground_probe = p.ground_probe_px * pixels_to_meters;
         float wall_probe = p.wall_probe_px * pixels_to_meters;
 
         float half_width = p.width_px / 2.0f * pixels_to_meters;
         float half_height = p.height_px / 2.0f * pixels_to_meters;
+
         // Ground: cast down from two points near the feet (left/right)
+        auto pos = body->get_position_meters();
         b2Vec2 ground_left_start = { pos.x - half_width, pos.y + half_height};
         b2Vec2 ground_right_start = { pos.x + half_width, pos.y + half_height};
         b2Vec2 ground_translation = { 0, ground_probe };
 
-        RayHit left_ground_hit = raycast_closest(world, body, ground_left_start, ground_translation);
-        RayHit right_ground_hit = raycast_closest(world, body, ground_right_start, ground_translation);
+        RayHit left_ground_hit = raycast_closest(world, body->id, ground_left_start, ground_translation);
+        RayHit right_ground_hit = raycast_closest(world, body->id, ground_right_start, ground_translation);
         grounded = left_ground_hit.hit || right_ground_hit.hit;
 
         // Walls: cast left/right at mid-body height
@@ -908,8 +994,8 @@ public:
         b2Vec2 wall_right_start = { pos.x + half_width, mid.y };
         b2Vec2 wall_right_translation = { wall_probe, 0 };
 
-        RayHit left_wall_hit  = raycast_closest(world, body, wall_left_start, wall_left_translation);
-        RayHit right_wall_hit = raycast_closest(world, body, wall_right_start, wall_right_translation);
+        RayHit left_wall_hit  = raycast_closest(world, body->id, wall_left_start, wall_left_translation);
+        RayHit right_wall_hit = raycast_closest(world, body->id, wall_right_start, wall_right_translation);
 
         on_wall_left = left_wall_hit.hit;
         on_wall_right = right_wall_hit.hit;
@@ -919,48 +1005,45 @@ public:
 
         float target_vx = move_x * p.max_speed_px_s;
 
+        auto v = body->get_velocity_pixels();
+
         if (std::fabs(target_vx) > 0.001f) {
             float a = p.accel_px_s2;
-            vx = move_towards(vx, target_vx, a * delta_time);
+            v.x = move_towards(v.x, target_vx, a * delta_time);
         } else {
             float a = p.decel_px_s2;
-            vx = move_towards(vx, 0.0f, a * delta_time);
+            v.x = move_towards(v.x, 0.0f, a * delta_time);
         }
 
         // Gravity (custom)
-        vy += p.gravity_px_s2 * delta_time;
-        vy = std::max(-p.fall_speed_px_s, std::min(p.fall_speed_px_s, vy));
+        v.y += p.gravity_px_s2 * delta_time;
+        v.y = std::max(-p.fall_speed_px_s, std::min(p.fall_speed_px_s, v.y));
 
         // Jump
         const bool can_jump = (grounded || coyote_timer > 0.0f);
         if (jump_buffer_timer > 0.0f && can_jump) {
             // Jump is negative Y if your screen coords are +down; adjust if needed.
             // Your gravity in earlier examples was +10 in Box2D meaning +down, so:
-            vy = -p.jump_speed_px_s;
+            v.y = -p.jump_speed_px_s;
             jump_buffer_timer = 0.0f;
             coyote_timer = 0.0f;
             grounded = false;
         }
 
         // Variable jump height: cut upward velocity when jump released
-        if (!jump_held && vy < 0.0f) {
-            vy *= p.jump_cut_mul;
+        if (!jump_held && v.y < 0.0f) {
+            v.y *= p.jump_cut_mul;
         }
 
-        // Write velocity back in m/s
-        b2Vec2 out_v = { vx * pixels_to_meters, vy * pixels_to_meters };
-        b2Body_SetLinearVelocity(body, out_v);
+        // Write velocity back
+        body->set_velocity(v);
     }
 
     void draw() override {
-        auto physics = scene->get_service<PhysicsService>();
-        float meters_to_pixels = physics->meters_to_pixels;
-        float pixels_to_meters = physics->pixels_to_meters;
-
         Color color = grounded ? GREEN : BLUE;
-        b2Vec2 pos = b2Body_GetPosition(body);
+        auto pos = body->get_position_pixels();
         DrawRectanglePro(
-            {  pos.x * meters_to_pixels, pos.y * meters_to_pixels, p.width_px, p.height_px },
+            {  pos.x, pos.y, p.width_px, p.height_px },
             { p.width_px / 2.0f, p.height_px / 2.0f },
             0.0f,
             color
@@ -1034,7 +1117,7 @@ public:
         auto camera = dynamic_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
         auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
         auto physics = get_service<PhysicsService>();
-        camera->camera.target = physics->convert_to_pixels(b2Body_GetPosition(player->body));
+        camera->camera.target = player->body->get_position_pixels();
 
         Scene::update(delta_time);
     }
