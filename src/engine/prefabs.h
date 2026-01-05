@@ -71,18 +71,18 @@ public:
         return raycast_closest(world, ignore, start, translation);
     }
 
-    std::vector<b2BodyId> circle_overlap(Vector2 center, float radius) {
+    std::vector<b2BodyId> circle_overlap(Vector2 center, float radius, b2BodyId ignore_body = b2_nullBodyId) {
         auto center_m = convert_to_meters(center);
         auto radius_m = convert_to_meters(radius);
-        return circle_hit(world, b2_nullBodyId, center_m, radius_m);
+        return circle_hit(world, ignore_body, center_m, radius_m);
     }
 
-    std::vector<b2BodyId> rectangle_overlap(Rectangle rectangle, float rotation = 0.0f) {
+    std::vector<b2BodyId> rectangle_overlap(Rectangle rectangle, float rotation = 0.0f, b2BodyId ignore_body = b2_nullBodyId) {
         Vector2 size = {rectangle.width, rectangle.height};
         Vector2 center = {rectangle.x + size.x / 2.0f, rectangle.y + size.y / 2.0f};
         auto size_m = convert_to_meters(size);
         auto center_m = convert_to_meters(center);
-        return rectangle_hit(world, b2_nullBodyId, center_m, size_m, rotation);
+        return rectangle_hit(world, ignore_body, center_m, size_m, rotation);
     }
 };
 
@@ -159,6 +159,47 @@ public:
             auto body = body_a == id ? body_b : body_a;
             contacts.push_back(body);
         }
+
+        // Remove duplicate bodies.
+        std::sort(contacts.begin(), contacts.end());
+        contacts.erase(std::unique(contacts.begin(), contacts.end() ), contacts.end());
+        return contacts;
+    }
+
+    /**
+     * Get a list of all bodies overlapping with sensors in this body.
+     * The shape definitions must have isSensor and enableSensorEvents set. https://box2d.org/documentation/md_simulation.html#autotoc_md81
+     *
+     * @return A list of b2BodyIds that are overlapping the sensor shapes in this body. Combine with User Data to get your objects.
+     */
+    std::vector<b2BodyId> get_sensor_overlaps() {
+        int shape_capacity = b2Body_GetShapeCount(id);
+        std::vector<b2ShapeId> shapes;
+        shapes.reserve(shape_capacity);
+        int shape_count = b2Body_GetShapes(id, shapes.data(), shape_capacity);
+
+        std::vector<b2BodyId> contacts;
+        for (int i = 0; i < shape_count; i++) {
+            auto shape = shapes[i];
+            if (b2Shape_IsSensor(shape)) {
+                int contact_capacity = b2Shape_GetContactCapacity(shape);
+                std::vector<b2ContactData> contact_data;
+                contact_data.reserve(contact_capacity);
+                int contact_count = b2Shape_GetContactData(shape, contact_data.data(), contact_capacity);
+
+                for (int j = 0; j < contact_count; j++) {
+                    auto contact = contact_data[j];
+                    auto body_a = b2Shape_GetBody(contact.shapeIdA);
+                    auto body_b = b2Shape_GetBody(contact.shapeIdB);
+                    auto body = body_a == id ? body_b : body_a;
+                    contacts.push_back(body);
+                }
+            }
+        }
+
+        // Remove duplicate bodies.
+        std::sort(contacts.begin(), contacts.end());
+        contacts.erase(std::unique(contacts.begin(), contacts.end() ), contacts.end());
         return contacts;
     }
 };
