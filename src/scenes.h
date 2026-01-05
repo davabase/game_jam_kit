@@ -1,0 +1,80 @@
+#pragma once
+
+#include "engine/prefabs.h"
+
+class Playground : public Scene {
+public:
+    DebugRenderer debug;
+
+    void init() override {
+        add_service<PhysicsService>();
+        std::vector<std::string> collision_names = {"walls"};
+        add_service<LDtkService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
+
+        init_services();
+
+        auto level = get_service<LDtkService>();
+        auto player_entity = level->get_entity_by_name("Player");
+        if (!player_entity) {
+            assert(false);
+        }
+        auto box_entity = level->get_entity_by_tag("box");
+        if (!box_entity) {
+            assert(false);
+        }
+
+        CharacterParams params;
+        params.position = level->convert_to_pixels(player_entity->getPosition());
+        auto character = add_game_object<Character>(params);
+        character->add_tag("character");
+
+        auto position = level->convert_to_pixels(box_entity->getPosition());
+        auto size = level->convert_to_pixels(box_entity->getSize());
+        auto box = add_game_object<DynamicBox>(position, size, 46.0f);
+
+
+        auto ground = add_game_object<StaticBox>(400.0f, 587.5f, 800.0f, 25.0f);
+        ground->add_tag("ground");
+
+        // auto camera = add_game_object<CameraObject>(Vector2{800, 600}, level->get_size());
+        // camera->add_tag("camera");
+
+        auto split_camera = add_game_object<SplitCamera>(Vector2{400, 600}, level->get_size());
+        split_camera->add_tag("camera");
+
+        auto split_camera2 = add_game_object<SplitCamera>(Vector2{400, 600}, level->get_size());
+        split_camera2->add_tag("camera");
+
+        debug.init();
+
+        Scene::init();
+    }
+
+    void update(float delta_time) override {
+        auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
+        auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
+        auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
+        auto physics = get_service<PhysicsService>();
+        camera->target = player->body->get_position_pixels();
+        camera2->target = player->body->get_position_pixels();
+
+        Scene::update(delta_time);
+    }
+
+    void draw() override {
+        auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
+        auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
+        camera->draw_begin();
+        Scene::draw();
+        // debug.debug_draw(get_service<PhysicsService>()->world);
+        camera->draw_end();
+
+        camera2->draw_begin();
+        Scene::draw();
+        camera2->draw_end();
+        camera->draw_texture(0, 0);
+        camera2->draw_texture(400, 0);
+
+        DrawLine(400, 0, 400, 600, GRAY);
+    }
+};

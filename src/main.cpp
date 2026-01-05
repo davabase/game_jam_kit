@@ -1,8 +1,4 @@
-#include <iostream>
-#include <thread>
-
-#include <raylib.h>
-#include "scene.h"
+#include "scenes.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
