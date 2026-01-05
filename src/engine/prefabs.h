@@ -2,6 +2,69 @@
 
 #include "scene.h"
 
+// Unary add one vector to another
+inline void operator+=( Vector2& a, Vector2 b )
+{
+    a.x += b.x;
+    a.y += b.y;
+}
+
+/// Unary subtract one vector from another
+inline void operator-=( Vector2& a, Vector2 b )
+{
+    a.x -= b.x;
+    a.y -= b.y;
+}
+
+/// Unary multiply a vector by a scalar
+inline void operator*=( Vector2& a, float b )
+{
+    a.x *= b;
+    a.y *= b;
+}
+
+/// Unary negate a vector
+inline Vector2 operator-( Vector2 a )
+{
+    return { -a.x, -a.y };
+}
+
+/// Binary vector addition
+inline Vector2 operator+( Vector2 a, Vector2 b )
+{
+    return { a.x + b.x, a.y + b.y };
+}
+
+/// Binary vector subtraction
+inline Vector2 operator-( Vector2 a, Vector2 b )
+{
+    return { a.x - b.x, a.y - b.y };
+}
+
+/// Binary scalar and vector multiplication
+inline Vector2 operator*( float a, Vector2 b )
+{
+    return { a * b.x, a * b.y };
+}
+
+/// Binary scalar and vector multiplication
+inline Vector2 operator*( Vector2 a, float b )
+{
+    return { a.x * b, a.y * b };
+}
+
+/// Binary vector equality
+inline bool operator==( Vector2 a, Vector2 b )
+{
+    return a.x == b.x && a.y == b.y;
+}
+
+/// Binary vector inequality
+inline bool operator!=( Vector2 a, Vector2 b )
+{
+    return a.x != b.x || a.y != b.y;
+}
+
 class PhysicsService : public Service {
 public:
     b2WorldId world = b2_nullWorldId;
@@ -40,7 +103,8 @@ public:
     }
 
     b2Vec2 convert_to_meters(Vector2 pixels) const {
-        return {pixels.x * pixels_to_meters, pixels.y * pixels_to_meters};
+        const auto converted = pixels * pixels_to_meters;
+        return {converted.x, converted.y};
     }
 
     float convert_to_pixels(float meters) const {
@@ -49,6 +113,22 @@ public:
 
     float convert_to_meters(float pixels) const {
         return pixels * pixels_to_meters;
+    }
+
+    /**
+     * Raycast in pixels.
+     *
+     * @param ignore Box2d body to ignore.
+     * @param from The start point of the ray.
+     * @param to The end point of the ray.
+     *
+     * @return A RayHit struct describing the hit.
+     */
+    RayHit raycast(b2BodyId ignore, Vector2 from, Vector2 to) {
+        auto start = convert_to_meters(from);
+        auto translation = convert_to_meters(to - from);
+
+        return raycast_closest(world, ignore, start, translation);
     }
 };
 
