@@ -58,20 +58,30 @@ public:
         camera->target = player->body->get_position_pixels();
         camera2->target = player->body->get_position_pixels();
 
+        auto local = camera->screen_to_world({0, 0}, GetMousePosition());
+        Rectangle rec = {local.x - 10, local.y - 10, 20, 20};
+        auto contacts = physics->rectangle_overlap(rec, 0);
+        printf("Contacts: %zd\n", contacts.size());
+
         Scene::update(delta_time);
     }
 
     void draw() override {
         auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
+        // The scene needs to be rendered for each camera.
         camera->draw_begin();
         Scene::draw();
-        // debug.debug_draw(get_service<PhysicsService>()->world);
+        auto local = camera->screen_to_world({0, 0}, GetMousePosition());
+        Rectangle rec = {local.x - 10, local.y - 10, 20, 20};
+        DrawRectangle(rec.x, rec.y, rec.width, rec.height, MAGENTA);
         camera->draw_end();
 
         camera2->draw_begin();
         Scene::draw();
         camera2->draw_end();
+
+        // Draw the resulting views.
         camera->draw_texture(0, 0);
         camera2->draw_texture(400, 0);
 

@@ -1,69 +1,7 @@
 #pragma once
 
 #include "scene.h"
-
-// Unary add one vector to another
-inline void operator+=( Vector2& a, Vector2 b )
-{
-    a.x += b.x;
-    a.y += b.y;
-}
-
-/// Unary subtract one vector from another
-inline void operator-=( Vector2& a, Vector2 b )
-{
-    a.x -= b.x;
-    a.y -= b.y;
-}
-
-/// Unary multiply a vector by a scalar
-inline void operator*=( Vector2& a, float b )
-{
-    a.x *= b;
-    a.y *= b;
-}
-
-/// Unary negate a vector
-inline Vector2 operator-( Vector2 a )
-{
-    return { -a.x, -a.y };
-}
-
-/// Binary vector addition
-inline Vector2 operator+( Vector2 a, Vector2 b )
-{
-    return { a.x + b.x, a.y + b.y };
-}
-
-/// Binary vector subtraction
-inline Vector2 operator-( Vector2 a, Vector2 b )
-{
-    return { a.x - b.x, a.y - b.y };
-}
-
-/// Binary scalar and vector multiplication
-inline Vector2 operator*( float a, Vector2 b )
-{
-    return { a * b.x, a * b.y };
-}
-
-/// Binary scalar and vector multiplication
-inline Vector2 operator*( Vector2 a, float b )
-{
-    return { a.x * b, a.y * b };
-}
-
-/// Binary vector equality
-inline bool operator==( Vector2 a, Vector2 b )
-{
-    return a.x == b.x && a.y == b.y;
-}
-
-/// Binary vector inequality
-inline bool operator!=( Vector2 a, Vector2 b )
-{
-    return a.x != b.x || a.y != b.y;
-}
+#include "math_extensions.h"
 
 class PhysicsService : public Service {
 public:
@@ -93,7 +31,9 @@ public:
     }
 
     void update() override {
-        if (!b2World_IsValid(world)) return;
+        if (!b2World_IsValid(world)) {
+            return;
+        }
         b2World_Step(world, time_step, sub_steps);
     }
 
@@ -129,6 +69,20 @@ public:
         auto translation = convert_to_meters(to - from);
 
         return raycast_closest(world, ignore, start, translation);
+    }
+
+    std::vector<b2BodyId> circle_overlap(Vector2 center, float radius) {
+        auto center_m = convert_to_meters(center);
+        auto radius_m = convert_to_meters(radius);
+        return circle_hit(world, b2_nullBodyId, center_m, radius_m);
+    }
+
+    std::vector<b2BodyId> rectangle_overlap(Rectangle rectangle, float rotation = 0.0f) {
+        Vector2 size = {rectangle.width, rectangle.height};
+        Vector2 center = {rectangle.x + size.x / 2.0f, rectangle.y + size.y / 2.0f};
+        auto size_m = convert_to_meters(size);
+        auto center_m = convert_to_meters(center);
+        return rectangle_hit(world, b2_nullBodyId, center_m, size_m, rotation);
     }
 };
 
@@ -184,6 +138,28 @@ public:
 
     void set_velocity(Vector2 pixels_per_second) {
         set_velocity(physics->convert_to_meters(pixels_per_second));
+    }
+
+    /**
+     * Get a list of all bodies colliding with this one.
+     *
+     * @return A list of b2BodyIds that are touching this one. Combine with User Data to get your objects.
+     */
+    std::vector<b2BodyId> get_contacts() {
+        int capacity = b2Body_GetContactCapacity(id);
+        std::vector<b2ContactData> contact_data;
+        contact_data.reserve(capacity);
+
+        int count = b2Body_GetContactData(id, contact_data.data(), capacity);
+        std::vector<b2BodyId> contacts;
+        for (int i = 0; i < count; i++) {
+            auto contact = contact_data[i];
+            auto body_a = b2Shape_GetBody(contact.shapeIdA);
+            auto body_b = b2Shape_GetBody(contact.shapeIdB);
+            auto body = body_a == id ? body_b : body_a;
+            contacts.push_back(body);
+        }
+        return contacts;
     }
 };
 
@@ -1075,6 +1051,10 @@ public:
 
         DrawRectangleLinesEx(r, 2.0f * inv_zoom, c);
     }
+
+    Vector2 screen_to_world(Vector2 point) {
+        return GetScreenToWorld2D(point, camera);
+    }
 };
 
 class SplitCamera : public CameraObject {
@@ -1106,5 +1086,10 @@ public:
 
     void draw_texture(float x, float y) {
         DrawTextureRec(texture.texture, {0, 0, static_cast<float>(texture.texture.width), static_cast<float>(-texture.texture.height)}, {x, y}, WHITE);
+    }
+
+    Vector2 screen_to_world(Vector2 draw_position, Vector2 point) {
+        auto local_point = point - draw_position;
+        return GetScreenToWorld2D(local_point, camera);
     }
 };
