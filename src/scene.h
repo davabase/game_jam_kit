@@ -1087,8 +1087,8 @@ public:
     // The target position to follow, in pixels.
     Vector2 target = {0, 0};
 
-    // The center of the screen.
-    Vector2 center = {0, 0};
+    // The size of the screen.
+    Vector2 size = {0, 0};
 
     // The size of the level in pixels. The camera will clamp to this size.
     Vector2 level_size = {0, 0};
@@ -1102,8 +1102,8 @@ public:
     float offset_top = 100.0f;
     float offset_bottom = 100.0f;
 
-    CameraObject(Vector2 center, Vector2 level_size = {0, 0}, Vector2 follow_speed = {1000, 1000}, float offset_left = 150, float offset_right = 150, float offset_top = 100, float offset_bottom = 100) :
-        center(center),
+    CameraObject(Vector2 size, Vector2 level_size = {0, 0}, Vector2 follow_speed = {1000, 1000}, float offset_left = 150, float offset_right = 150, float offset_top = 100, float offset_bottom = 100) :
+        size(size),
         level_size(level_size),
         follow_speed(follow_speed),
         offset_left(offset_left),
@@ -1113,7 +1113,7 @@ public:
 
     void init() override {
         camera.zoom = 1.0f;
-        camera.offset = center;
+        camera.offset = {size.x / 2.0f, size.y / 2.0f};
         camera.rotation = 0.0f;
 
         camera.target = target;
@@ -1166,11 +1166,11 @@ public:
             camera.target.y = move_towards(camera.target.y, desired.y, follow_speed.y * dt);
         }
 
-        Vector2 half_view = {center.x * inv_zoom, center.y * inv_zoom};
-        if (level_size.x > center.x * 2) {
+        Vector2 half_view = {size.x / 2.0f * inv_zoom, size.y / 2.0f * inv_zoom};
+        if (level_size.x > size.x) {
             camera.target.x = clamp(camera.target.x, half_view.x, level_size.x - half_view.x);
         }
-        if (level_size.y > center.y * 2) {
+        if (level_size.y > size.y) {
             camera.target.y = clamp(camera.target.y, half_view.y, level_size.y - half_view.y);
         }
 
@@ -1208,7 +1208,7 @@ public:
         EndMode2D();
     }
 
-    void debug_draw_deadzone(Color c = {0, 255, 0, 120}) const {
+    void debug_draw(Color c = {0, 255, 0, 120}) const {
         float inv_zoom = (camera.zoom != 0.0f) ? (1.0f / camera.zoom) : 1.0f;
         float dz_left_w = offset_left * inv_zoom;
         float dz_right_w = offset_right * inv_zoom;
@@ -1222,6 +1222,38 @@ public:
         r.height = dz_top_w + dz_bottom_w;
 
         DrawRectangleLinesEx(r, 2.0f * inv_zoom, c);
+    }
+};
+
+class SplitCamera : public CameraObject {
+public:
+    RenderTexture2D texture;
+
+    SplitCamera(Vector2 size, Vector2 level_size = {0, 0}, Vector2 follow_speed = {1000, 1000}, float offset_left = 150, float offset_right = 150, float offset_top = 100, float offset_bottom = 100) :
+        CameraObject(size, level_size, follow_speed, offset_left, offset_right, offset_top, offset_bottom) {}
+
+    ~SplitCamera() {
+        UnloadRenderTexture(texture);
+    }
+
+    void init() override {
+        texture = LoadRenderTexture(size.x, size.y);
+        CameraObject::init();
+    }
+
+    void draw_begin() {
+        BeginTextureMode(texture);
+        ClearBackground(WHITE);
+        BeginMode2D(camera);
+    }
+
+    void draw_end() {
+        EndMode2D();
+        EndTextureMode();
+    }
+
+    void draw_texture(float x, float y) {
+        DrawTextureRec(texture.texture, {0, 0, static_cast<float>(texture.texture.width), static_cast<float>(-texture.texture.height)}, {x, y}, WHITE);
     }
 };
 
@@ -1260,8 +1292,14 @@ public:
         auto ground = add_game_object<StaticBox>(400.0f, 587.5f, 800.0f, 25.0f);
         ground->add_tag("ground");
 
-        auto camera = add_game_object<CameraObject>(Vector2{400, 300}, level->get_size());
-        camera->add_tag("camera");
+        // auto camera = add_game_object<CameraObject>(Vector2{800, 600}, level->get_size());
+        // camera->add_tag("camera");
+
+        auto split_camera = add_game_object<SplitCamera>(Vector2{400, 600}, level->get_size());
+        split_camera->add_tag("camera");
+
+        auto split_camera2 = add_game_object<SplitCamera>(Vector2{400, 600}, level->get_size());
+        split_camera2->add_tag("camera");
 
         debug.init();
 
@@ -1269,19 +1307,30 @@ public:
     }
 
     void update(float delta_time) override {
-        auto camera = dynamic_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
+        auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
+        auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
         auto physics = get_service<PhysicsService>();
         camera->target = player->body->get_position_pixels();
+        camera2->target = player->body->get_position_pixels();
 
         Scene::update(delta_time);
     }
 
     void draw() override {
-        auto camera = dynamic_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
+        auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
+        auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         camera->draw_begin();
         Scene::draw();
         // debug.debug_draw(get_service<PhysicsService>()->world);
         camera->draw_end();
+
+        camera2->draw_begin();
+        Scene::draw();
+        camera2->draw_end();
+        camera->draw_texture(0, 0);
+        camera2->draw_texture(400, 0);
+
+        DrawLine(400, 0, 400, 600, GRAY);
     }
 };
