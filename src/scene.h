@@ -685,6 +685,25 @@ public:
         return false;
     }
 
+    const ldtk::World& get_world() {
+        return project.getWorld();
+    }
+
+    const ldtk::Level& get_level() {
+        const auto& world  = project.getWorld();
+        return world.getLevel(level_name);
+    }
+
+    /**
+     * Get the level size in pixels.
+     *
+     * @return A Vector2 containing the size of the level.
+     */
+    Vector2 get_size() {
+        const auto& level = get_level();
+        return {level.size.x * scale, level.size.y * scale};
+    }
+
     /**
      * Get all entities across all layers in the level.
      *
@@ -695,8 +714,7 @@ public:
             TraceLog(LOG_ERROR, "LDtk project not loaded.");
             return {};
         }
-        const auto& world  = project.getWorld();
-        const auto& level  = world.getLevel(level_name);
+        const auto& level  = get_level();
         const auto& layers = level.allLayers();
 
         std::vector<const ldtk::Entity*> entities;
@@ -718,8 +736,7 @@ public:
             TraceLog(LOG_ERROR, "LDtk project not loaded.");
             return {};
         }
-        const auto& world = project.getWorld();
-        const auto& level = world.getLevel(level_name);
+        const auto& level = get_level();
         const auto& layers = level.allLayers();
 
         std::vector<const ldtk::Entity*> entities;
@@ -736,13 +753,12 @@ public:
         return entities;
     }
 
-     std::vector<const ldtk::Entity*> get_entities_by_tag(const std::string& tag) {
+    std::vector<const ldtk::Entity*> get_entities_by_tag(const std::string& tag) {
         if (!is_init) {
             TraceLog(LOG_ERROR, "LDtk project not loaded.");
             return {};
         }
-        const auto& world = project.getWorld();
-        const auto& level = world.getLevel(level_name);
+        const auto& level = get_level();
         const auto& layers = level.allLayers();
 
         std::vector<const ldtk::Entity*> entities;
@@ -1068,8 +1084,120 @@ class CameraObject : public GameObject {
 public:
     Camera2D camera;
 
+    // The target position to follow, in pixels.
+    Vector2 target = {0, 0};
+
+    // The center of the screen.
+    Vector2 center = {0, 0};
+
+    // The size of the level in pixels. The camera will clamp to this size.
+    Vector2 level_size = {0, 0};
+
+    // Tracking speed in pixels per second.
+    Vector2 follow_speed = {1000, 1000};
+
+    // Deadzone bounds in pixels relative to the center.
+    float offset_left = 150.0f;
+    float offset_right = 150.0f;
+    float offset_top = 100.0f;
+    float offset_bottom = 100.0f;
+
+    CameraObject(Vector2 center, Vector2 level_size = {0, 0}, Vector2 follow_speed = {1000, 1000}, float offset_left = 150, float offset_right = 150, float offset_top = 100, float offset_bottom = 100) :
+        center(center),
+        level_size(level_size),
+        follow_speed(follow_speed),
+        offset_left(offset_left),
+        offset_right(offset_right),
+        offset_top(offset_top),
+        offset_bottom(offset_bottom) {}
+
     void init() override {
+        camera.zoom = 1.0f;
+        camera.offset = center;
+        camera.rotation = 0.0f;
+
+        camera.target = target;
+
         GameObject::init();
+    }
+
+    void update(float dt) override {
+        // Desired camera.target after applying deadzone.
+        Vector2 desired = camera.target;
+
+        // Convert deadzone from SCREEN pixels to WORLD pixels (depends on zoom).
+        // Because camera.target is in world units.
+        float inv_zoom = (camera.zoom != 0.0f) ? (1.0f / camera.zoom) : 1.0f;
+
+        float dz_left_w = offset_left * inv_zoom;
+        float dz_right_w = offset_right * inv_zoom;
+        float dz_top_w = offset_top * inv_zoom;
+        float dz_bottom_w = offset_bottom * inv_zoom;
+
+        // Compute target displacement from current camera center (world-space).
+        float dx = target.x - camera.target.x;
+        float dy = target.y - camera.target.y;
+
+        // If target is outside deadzone, shift desired camera center just enough to bring it back.
+        if (dx < -dz_left_w) {
+            desired.x = target.x + dz_left_w;
+        } else if (dx > dz_right_w) {
+            desired.x = target.x - dz_right_w;
+        }
+
+        if (dy < -dz_top_w) {
+            desired.y = target.y + dz_top_w;
+        } else if (dy > dz_bottom_w) {
+            desired.y = target.y - dz_bottom_w;
+        }
+
+        // Apply tracking speed per axis.
+        if (follow_speed.x < 0) {
+            camera.target.x = desired.x;
+        }
+        else {
+            camera.target.x = move_towards(camera.target.x, desired.x, follow_speed.x * dt);
+        }
+
+        if (follow_speed.y < 0) {
+            camera.target.y = desired.y;
+        }
+        else {
+            camera.target.y = move_towards(camera.target.y, desired.y, follow_speed.y * dt);
+        }
+
+        Vector2 half_view = {center.x * inv_zoom, center.y * inv_zoom};
+        if (level_size.x > center.x * 2) {
+            camera.target.x = clamp(camera.target.x, half_view.x, level_size.x - half_view.x);
+        }
+        if (level_size.y > center.y * 2) {
+            camera.target.y = clamp(camera.target.y, half_view.y, level_size.y - half_view.y);
+        }
+
+        GameObject::update(dt);
+    }
+
+    float move_towards(float current, float target, float maxDelta) {
+        float d = target - current;
+        if (d >  maxDelta) return current + maxDelta;
+        if (d < -maxDelta) return current - maxDelta;
+        return target;
+    }
+
+    float clamp(float v, float lo, float hi) {
+        return (v < lo) ? lo : (v > hi) ? hi : v;
+    }
+
+    void set_target(Vector2 target) {
+        this->target = target;
+    }
+
+    void set_zoom(float zoom) {
+        camera.zoom = zoom;
+    }
+
+    void set_rotation(float angle) {
+        camera.rotation = angle;
     }
 
     void draw_begin() {
@@ -1079,7 +1207,24 @@ public:
     void draw_end() {
         EndMode2D();
     }
+
+    void debug_draw_deadzone(Color c = {0, 255, 0, 120}) const {
+        float inv_zoom = (camera.zoom != 0.0f) ? (1.0f / camera.zoom) : 1.0f;
+        float dz_left_w = offset_left * inv_zoom;
+        float dz_right_w = offset_right * inv_zoom;
+        float dz_top_w = offset_top * inv_zoom;
+        float dz_bottom_w = offset_bottom * inv_zoom;
+
+        Rectangle r;
+        r.x = camera.target.x - dz_left_w;
+        r.y = camera.target.y - dz_top_w;
+        r.width = dz_left_w + dz_right_w;
+        r.height = dz_top_w + dz_bottom_w;
+
+        DrawRectangleLinesEx(r, 2.0f * inv_zoom, c);
+    }
 };
+
 
 class Playground : public Scene {
 public:
@@ -1115,11 +1260,8 @@ public:
         auto ground = add_game_object<StaticBox>(400.0f, 587.5f, 800.0f, 25.0f);
         ground->add_tag("ground");
 
-        auto camera = add_game_object<CameraObject>();
+        auto camera = add_game_object<CameraObject>(Vector2{400, 300}, level->get_size());
         camera->add_tag("camera");
-        camera->camera.zoom = 1;
-        camera->camera.offset = {400, 300};
-        camera->camera.rotation = 0;
 
         debug.init();
 
@@ -1130,7 +1272,7 @@ public:
         auto camera = dynamic_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
         auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
         auto physics = get_service<PhysicsService>();
-        camera->camera.target = player->body->get_position_pixels();
+        camera->target = player->body->get_position_pixels();
 
         Scene::update(delta_time);
     }
