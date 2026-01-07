@@ -140,6 +140,11 @@ public:
         set_velocity(physics->convert_to_meters(pixels_per_second));
     }
 
+    float get_rotation() const {
+        auto rot = b2Body_GetRotation(id);
+        return b2Rot_GetAngle(rot) * RAD2DEG;
+    }
+
     /**
      * Get a list of all bodies colliding with this one.
      *
@@ -688,6 +693,89 @@ public:
     }
 };
 
+class SpriteComponent : public Component {
+public:
+    std::string filename;
+
+    Texture2D sprite;
+    Vector2 position = {0, 0};
+    float rotation = 0.0f;
+    float scale = 1.0f;
+    Color tint = WHITE;
+
+    SpriteComponent(std::string filename) : filename(filename) {}
+
+    ~SpriteComponent() {
+        UnloadTexture(sprite);
+    }
+
+    void init() override {
+        sprite = LoadTexture(filename.c_str());
+    }
+
+    void draw() override {
+        Rectangle source = {0, 0, (float)sprite.width, (float)sprite.height};
+        Rectangle dest = {position.x, position.y, (float)sprite.width * scale, (float)sprite.height * scale};
+        Vector2 origin = {sprite.width / 2.0f * scale, sprite.height / 2.0f * scale};
+
+        DrawTexturePro(sprite, source, dest, origin, rotation, tint);
+    }
+
+    void set_position(Vector2 position) {
+        this->position = position;
+    }
+
+    void set_rotation(float rotation) {
+        this->rotation = rotation;
+    }
+
+    void set_scale(float scale) {
+        this->scale = scale;
+    }
+
+    void set_tint(Color tint) {
+        this->tint = tint;
+    }
+};
+
+class SpriteBodyComponent : public Component {
+public:
+    BodyComponent* body;
+    std::string filename;
+
+    Texture2D sprite;
+    float scale = 1.0f;
+    Color tint = WHITE;
+
+    SpriteBodyComponent(BodyComponent* body, std::string filename) : body(body), filename(filename) {}
+
+    ~SpriteBodyComponent() {
+        UnloadTexture(sprite);
+    }
+
+    void init() override {
+        sprite = LoadTexture(filename.c_str());
+    }
+
+    void draw() override {
+        auto pos = body->get_position_pixels();
+        auto rotation = body->get_rotation();
+        Rectangle source = {0, 0, (float)sprite.width, (float)sprite.height};
+        Rectangle dest = {pos.x, pos.y, (float)sprite.width * scale, (float)sprite.height * scale};
+        Vector2 origin = {sprite.width / 2.0f * scale, sprite.height / 2.0f * scale};
+
+        DrawTexturePro(sprite, source, dest, origin, rotation, tint);
+    }
+
+    void set_scale(float scale) {
+        this->scale = scale;
+    }
+
+    void set_tint(Color tint) {
+        this->tint = tint;
+    }
+};
+
 class StaticBox : public GameObject {
 public:
     b2BodyId body = b2_nullBodyId;
@@ -710,6 +798,8 @@ public:
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
 
         add_component<BodyComponent>(body);
+
+        GameObject::init();
     }
 
     void draw() override {
@@ -748,7 +838,10 @@ public:
         box_shape_def.material = body_material;
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
 
-        add_component<BodyComponent>(body);
+        auto body_component = add_component<BodyComponent>(body);
+        add_component<SpriteBodyComponent>(body_component, "assets/character_green_idle.png");
+
+        GameObject::init();
     }
 
     void draw() override {
@@ -758,11 +851,13 @@ public:
         float angle = b2Rot_GetAngle(rot) * RAD2DEG;
 
         DrawRectanglePro(
-            {  pos.x * meters_to_pixels, pos.y * meters_to_pixels, width, height },
+            {  physics->convert_to_pixels(pos.x), physics->convert_to_pixels(pos.y), width, height },
             { width / 2.0f, height / 2.0f },
             angle,
             RED
         );
+
+        GameObject::draw();
     }
 };
 
@@ -969,6 +1064,8 @@ public:
         mp.height = p.height;
         movement = add_component<MovementComponent>(mp);
 
+        add_component<SpriteBodyComponent>(body, "assets/character_green_idle.png");
+
         GameObject::init();
     }
 
@@ -1005,6 +1102,8 @@ public:
             0.0f,
             color
         );
+
+        GameObject::draw();
     }
 };
 
