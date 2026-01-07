@@ -738,23 +738,14 @@ public:
     }
 };
 
-class SpriteBodyComponent : public Component {
+class SpriteBodyComponent : public SpriteComponent {
 public:
     BodyComponent* body;
-    std::string filename;
 
-    Texture2D sprite;
-    float scale = 1.0f;
-    Color tint = WHITE;
-
-    SpriteBodyComponent(BodyComponent* body, std::string filename) : body(body), filename(filename) {}
+    SpriteBodyComponent(BodyComponent* body, std::string filename) : body(body), SpriteComponent(filename) {}
 
     ~SpriteBodyComponent() {
         UnloadTexture(sprite);
-    }
-
-    void init() override {
-        sprite = LoadTexture(filename.c_str());
     }
 
     void draw() override {
@@ -766,13 +757,107 @@ public:
 
         DrawTexturePro(sprite, source, dest, origin, rotation, tint);
     }
+};
 
-    void set_scale(float scale) {
-        this->scale = scale;
+class AnimationComponent : public SpriteComponent {
+public:
+    std::vector<std::string> filenames;
+    float fps = 0.0f;
+    bool loop = true;
+
+    std::vector<Texture2D> frames;
+    int current_frame = 0;
+    float frame_timer = 0.0f;
+    bool play = true;
+
+    AnimationComponent(std::vector<std::string> filenames, float fps, bool loop = true) : filenames(filenames), fps(fps), loop(loop), SpriteComponent(filenames[0]) {}
+
+    ~AnimationComponent() {
+        for (auto& frame : frames) {
+            UnloadTexture(frame);
+        }
     }
 
-    void set_tint(Color tint) {
-        this->tint = tint;
+    void init() override {
+        for (auto& filename: filenames) {
+            frames.push_back(LoadTexture(filename.c_str()));
+        }
+
+        frame_timer = 1.0f / fps;
+        sprite = frames[0];
+    }
+
+    void update(float delta_time) override {
+        if (!play) {
+            return;
+        }
+
+        frame_timer = frame_timer - delta_time;
+        if (frame_timer <= 0.0f) {
+            frame_timer = 1.0f / fps;
+            current_frame++;
+        }
+
+        if (current_frame > frames.size() - 1) {
+            current_frame = 0;
+        }
+
+        sprite = frames[current_frame];
+    }
+
+    void set_play(bool play) {
+        this->play = play;
+    }
+};
+
+class AnimationBodyComponent : public SpriteBodyComponent {
+public:
+    std::vector<std::string> filenames;
+    float fps = 0.0f;
+    bool loop = true;
+
+    std::vector<Texture2D> frames;
+    int current_frame = 0;
+    float frame_timer = 0.0f;
+    bool play = true;
+
+    AnimationBodyComponent(BodyComponent* body, std::vector<std::string> filenames, float fps, bool loop = true) : filenames(filenames), fps(fps), loop(loop), SpriteBodyComponent(body, filenames[0]) {}
+
+    ~AnimationBodyComponent() {
+        for (auto& frame : frames) {
+            UnloadTexture(frame);
+        }
+    }
+
+    void init() override {
+        for (auto& filename: filenames) {
+            frames.push_back(LoadTexture(filename.c_str()));
+        }
+
+        frame_timer = 1.0f / fps;
+        sprite = frames[0];
+    }
+
+    void update(float delta_time) override {
+        if (!play) {
+            return;
+        }
+
+        frame_timer = frame_timer - delta_time;
+        if (frame_timer <= 0.0f) {
+            frame_timer = 1.0f / fps;
+            current_frame++;
+        }
+
+        if (current_frame > frames.size() - 1) {
+            current_frame = 0;
+        }
+
+        sprite = frames[current_frame];
+    }
+
+    void set_play(bool play) {
+        this->play = play;
     }
 };
 
@@ -1025,6 +1110,7 @@ public:
     PhysicsService* physics;
     BodyComponent* body;
     MovementComponent* movement;
+    AnimationBodyComponent* animation;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -1064,7 +1150,8 @@ public:
         mp.height = p.height;
         movement = add_component<MovementComponent>(mp);
 
-        add_component<SpriteBodyComponent>(body, "assets/character_green_idle.png");
+        // add_component<SpriteBodyComponent>(body, "assets/character_green_idle.png");
+        animation = add_component<AnimationBodyComponent>(body, std::vector<std::string>{"assets/character_green_walk_a.png", "assets/character_green_walk_b.png"}, 5.0f);
 
         GameObject::init();
     }
@@ -1087,6 +1174,7 @@ public:
         else if (IsKeyDown(KEY_A) || IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
             move_x = -1.0f;
         }
+        animation->set_play(move_x != 0);
 
         movement->set_input(move_x, jump_pressed, jump_held);
 
