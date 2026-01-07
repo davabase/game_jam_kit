@@ -678,6 +678,14 @@ public:
         auto pixels = physics->convert_to_pixels(meters);
         return {static_cast<int>(pixels.x / scale), static_cast<int>(pixels.y / scale)};
     }
+
+    Vector2 get_entity_position(ldtk::Entity* entity) {
+        return convert_to_pixels(entity->getPosition());
+    }
+
+    Vector2 get_entity_size(ldtk::Entity* entity) {
+        return convert_to_pixels(entity->getSize());
+    }
 };
 
 class StaticBox : public GameObject {
@@ -758,32 +766,157 @@ public:
     }
 };
 
+struct MovementParams {
+    float width = 24.0f; // pixels
+    float height = 40.0f; // pixels
+
+    // Movement
+    float max_speed = 220.0f; // pixels / second
+    float accel = 2000.0f; // pixels / second / second
+    float decel = 2500.0f; // pixels / second / second
+
+    // Gravity / jump
+    float gravity = 1400.0f; // pixels / second / second
+    float jump_speed = 520.0f; // pixels / second
+    float fall_speed = 1200.0f; // pixels / second
+    float jump_cutoff_multiplier = 0.45f; // jump multiplier when the jump button is released early
+
+    // Forgiveness
+    float coyote_time = 0.08f; // seconds
+    float jump_buffer = 0.10f; // seconds
+};
+
+class MovementComponent : public Component {
+public:
+    MovementParams p;
+    PhysicsService* physics;
+    BodyComponent* body;
+
+    bool grounded = false;
+    bool on_wall_left = false;
+    bool on_wall_right = false;
+    float coyote_timer = 0.0f;
+    float jump_buffer_timer = 0.0f;
+
+    float move_x = 0;
+    bool jump_pressed = false;
+    bool jump_held = false;
+
+    MovementComponent(MovementParams p) : p(p) {}
+
+    void init() override {
+        physics = owner->scene->get_service<PhysicsService>();
+        body = owner->get_component<BodyComponent>();
+
+        Component::init();
+    }
+
+    void update(float delta_time) override {
+        if (!b2Body_IsValid(body->id)) {
+            return;
+        }
+
+        coyote_timer = std::max(0.0f, coyote_timer - delta_time);
+        jump_buffer_timer = std::max(0.0f, jump_buffer_timer - delta_time);
+
+        if (jump_pressed) {
+            jump_buffer_timer = p.jump_buffer;
+        }
+
+        // Grounded check
+        grounded = false;
+        on_wall_left = false;
+        on_wall_right = false;
+
+        // Convert probe distances to meters
+        float ray_length = physics->convert_to_meters(4.0f);
+
+        float half_width = physics->convert_to_meters(p.width) / 2.0f;
+        float half_height = physics->convert_to_meters(p.height) / 2.0f;
+
+        // Ground: cast down from two points near the feet (left/right)
+        auto pos = body->get_position_meters();
+        b2Vec2 ground_left_start = { pos.x - half_width, pos.y + half_height};
+        b2Vec2 ground_right_start = { pos.x + half_width, pos.y + half_height};
+        b2Vec2 ground_translation = { 0, ray_length };
+        const b2WorldId world = physics->world;
+
+        RayHit left_ground_hit = raycast_closest(world, body->id, ground_left_start, ground_translation);
+        RayHit right_ground_hit = raycast_closest(world, body->id, ground_right_start, ground_translation);
+        grounded = left_ground_hit.hit || right_ground_hit.hit;
+
+        // Walls: cast left/right at mid-body height
+        b2Vec2 mid = { pos.x, pos.y };
+        b2Vec2 wall_left_start  = { pos.x - half_width, mid.y };
+        b2Vec2 wall_left_translation = { -ray_length, 0 };
+        b2Vec2 wall_right_start = { pos.x + half_width, mid.y };
+        b2Vec2 wall_right_translation = { ray_length, 0 };
+
+        RayHit left_wall_hit  = raycast_closest(world, body->id, wall_left_start, wall_left_translation);
+        RayHit right_wall_hit = raycast_closest(world, body->id, wall_right_start, wall_right_translation);
+
+        on_wall_left = left_wall_hit.hit;
+        on_wall_right = right_wall_hit.hit;
+        if (grounded) {
+            coyote_timer = p.coyote_time;
+        }
+
+        float target_vx = move_x * p.max_speed;
+
+        auto v = body->get_velocity_pixels();
+
+        if (std::fabs(target_vx) > 0.001f) {
+            float a = p.accel;
+            v.x = move_towards(v.x, target_vx, a * delta_time);
+        } else {
+            float a = p.decel;
+            v.x = move_towards(v.x, 0.0f, a * delta_time);
+        }
+
+        // Gravity (custom)
+        v.y += p.gravity * delta_time;
+        v.y = std::max(-p.fall_speed, std::min(p.fall_speed, v.y));
+
+        // Jump
+        const bool can_jump = (grounded || coyote_timer > 0.0f);
+        if (jump_buffer_timer > 0.0f && can_jump) {
+            v.y = -p.jump_speed;
+            jump_buffer_timer = 0.0f;
+            coyote_timer = 0.0f;
+            grounded = false;
+        }
+
+        // Variable jump height: cut upward velocity when jump released
+        if (!jump_held && v.y < 0.0f) {
+            v.y *= p.jump_cutoff_multiplier;
+        }
+
+        // Write velocity back
+        body->set_velocity(v);
+
+        Component::update(delta_time);
+    }
+
+    static float move_towards(float current, float target, float max_delta) {
+        float delta = target - current;
+        if (std::fabs(delta) <= max_delta) return target;
+        return current + (delta > 0 ? max_delta : -max_delta);
+    }
+
+    void set_input(float horizontal_speed, bool jump_pressed, bool jump_held) {
+        move_x = horizontal_speed;
+        this->jump_pressed = jump_pressed;
+        this->jump_held = jump_held;
+    }
+};
+
 struct CharacterParams {
     // Geometry in pixels
-    float width_px = 24.0f;
-    float height_px = 40.0f;
+    float width = 24.0f;
+    float height = 40.0f;
 
     // Initial position in pixels
     Vector2 position;
-
-    // Movement
-    float max_speed_px_s = 220.0f;
-    float accel_px_s2 = 2000.0f;
-    float decel_px_s2 = 2500.0f;
-
-    // Gravity / jump
-    float gravity_px_s2 = 1400.0f;
-    float jump_speed_px_s = 520.0f; // initial jump impulse (as velocity)
-    float fall_speed_px_s = 1200.0f; // terminal velocity
-    float jump_cut_mul = 0.45f; // when jump released early, meters_to_pixels upward vel
-
-    // Forgiveness
-    float coyote_time_s = 0.08f;
-    float jump_buffer_s = 0.10f;
-
-    // Raycast probes (in pixels)
-    float ground_probe_px = 4.0f;
-    float wall_probe_px = 3.0f;
 
     // Surface behavior
     float friction = 0.0f;
@@ -794,7 +927,9 @@ struct CharacterParams {
 class Character : public GameObject {
 public:
     CharacterParams p;
+    PhysicsService* physics;
     BodyComponent* body;
+    MovementComponent* movement;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -802,14 +937,10 @@ public:
     float coyote_timer = 0.0f;
     float jump_buffer_timer = 0.0f;
 
-    PhysicsService* physics;
-
     Character(CharacterParams p) : p(p) {}
 
     void init() override {
         physics = scene->get_service<PhysicsService>();
-        const float pixels_to_meters = physics->pixels_to_meters;
-        auto world = physics->world;
 
         body = add_component<BodyComponent>([=](BodyComponent& b){
             b2BodyDef body_def = b2DefaultBodyDef();
@@ -819,7 +950,7 @@ public:
             body_def.linearDamping = 0.0f;
             body_def.angularDamping = 0.0f;
             body_def.position = physics->convert_to_meters(p.position);
-            b.id = b2CreateBody(world, &body_def);
+            b.id = b2CreateBody(physics->world, &body_def);
 
             b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
             body_material.friction = p.friction;
@@ -829,120 +960,48 @@ public:
             box_shape_def.density = p.density;
             box_shape_def.material = body_material;
 
-            // b2Polygon body_polygon = b2MakeBox(p.width_px / 2.0f * pixels_to_meters, p.height_px / 2.0f * pixels_to_meters);
-            b2Polygon body_polygon = b2MakeRoundedBox(p.width_px / 2.0f * pixels_to_meters, p.height_px / 2.0f * pixels_to_meters, 1 * pixels_to_meters);
+            b2Polygon body_polygon = b2MakeRoundedBox(physics->convert_to_meters(p.width / 2.0f), physics->convert_to_meters(p.height / 2.0f), physics->convert_to_meters(0.25));
             b2CreatePolygonShape(b.id, &box_shape_def, &body_polygon);
         });
+
+        MovementParams mp;
+        mp.width = p.width;
+        mp.height = p.height;
+        movement = add_component<MovementComponent>(mp);
 
         GameObject::init();
     }
 
-    static float move_towards(float current, float target, float max_delta) {
-        float delta = target - current;
-        if (std::fabs(delta) <= max_delta) return target;
-        return current + (delta > 0 ? max_delta : -max_delta);
-    }
-
     void update(float delta_time) override {
-        if (!b2Body_IsValid(body->id)) {
-            return;
+        int gamepad = 0;
+        float deadzone = 0.1f;
+
+        const bool jump_pressed = IsKeyPressed(KEY_W) || IsGamepadButtonPressed(gamepad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+        const bool jump_held = IsKeyDown(KEY_W) || IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+
+        float move_x = 0.0f;
+        move_x = GetGamepadAxisMovement(gamepad, GAMEPAD_AXIS_LEFT_X);
+        if (fabsf(move_x) < deadzone) {
+            move_x = 0.0f;
+        }
+        if (IsKeyDown(KEY_D) || IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
+            move_x = 1.0f;
+        }
+        else if (IsKeyDown(KEY_A) || IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
+            move_x = -1.0f;
         }
 
-        const float move_x = IsKeyDown(KEY_D) ? 1.0f : (IsKeyDown(KEY_A) ? -1.0f : 0.0f);
-        const bool jump_pressed = IsKeyPressed(KEY_W);
-        const bool jump_held = IsKeyDown(KEY_W);
+        movement->set_input(move_x, jump_pressed, jump_held);
 
-        const float meters_to_pixels = physics->meters_to_pixels;
-        const float pixels_to_meters = physics->pixels_to_meters;
-        const b2WorldId world = physics->world;
-
-        coyote_timer = std::max(0.0f, coyote_timer - delta_time);
-        jump_buffer_timer = std::max(0.0f, jump_buffer_timer - delta_time);
-
-        if (jump_pressed) {
-            jump_buffer_timer = p.jump_buffer_s;
-        }
-
-        // Grounded check
-        grounded = false;
-        on_wall_left = false;
-        on_wall_right = false;
-
-        // Convert probe distances to meters
-        float ground_probe = p.ground_probe_px * pixels_to_meters;
-        float wall_probe = p.wall_probe_px * pixels_to_meters;
-
-        float half_width = p.width_px / 2.0f * pixels_to_meters;
-        float half_height = p.height_px / 2.0f * pixels_to_meters;
-
-        // Ground: cast down from two points near the feet (left/right)
-        auto pos = body->get_position_meters();
-        b2Vec2 ground_left_start = { pos.x - half_width, pos.y + half_height};
-        b2Vec2 ground_right_start = { pos.x + half_width, pos.y + half_height};
-        b2Vec2 ground_translation = { 0, ground_probe };
-
-        RayHit left_ground_hit = raycast_closest(world, body->id, ground_left_start, ground_translation);
-        RayHit right_ground_hit = raycast_closest(world, body->id, ground_right_start, ground_translation);
-        grounded = left_ground_hit.hit || right_ground_hit.hit;
-
-        // Walls: cast left/right at mid-body height
-        b2Vec2 mid = { pos.x, pos.y };
-        b2Vec2 wall_left_start  = { pos.x - half_width, mid.y };
-        b2Vec2 wall_left_translation = { -wall_probe, 0 };
-        b2Vec2 wall_right_start = { pos.x + half_width, mid.y };
-        b2Vec2 wall_right_translation = { wall_probe, 0 };
-
-        RayHit left_wall_hit  = raycast_closest(world, body->id, wall_left_start, wall_left_translation);
-        RayHit right_wall_hit = raycast_closest(world, body->id, wall_right_start, wall_right_translation);
-
-        on_wall_left = left_wall_hit.hit;
-        on_wall_right = right_wall_hit.hit;
-        if (grounded) {
-            coyote_timer = p.coyote_time_s;
-        }
-
-        float target_vx = move_x * p.max_speed_px_s;
-
-        auto v = body->get_velocity_pixels();
-
-        if (std::fabs(target_vx) > 0.001f) {
-            float a = p.accel_px_s2;
-            v.x = move_towards(v.x, target_vx, a * delta_time);
-        } else {
-            float a = p.decel_px_s2;
-            v.x = move_towards(v.x, 0.0f, a * delta_time);
-        }
-
-        // Gravity (custom)
-        v.y += p.gravity_px_s2 * delta_time;
-        v.y = std::max(-p.fall_speed_px_s, std::min(p.fall_speed_px_s, v.y));
-
-        // Jump
-        const bool can_jump = (grounded || coyote_timer > 0.0f);
-        if (jump_buffer_timer > 0.0f && can_jump) {
-            // Jump is negative Y if your screen coords are +down; adjust if needed.
-            // Your gravity in earlier examples was +10 in Box2D meaning +down, so:
-            v.y = -p.jump_speed_px_s;
-            jump_buffer_timer = 0.0f;
-            coyote_timer = 0.0f;
-            grounded = false;
-        }
-
-        // Variable jump height: cut upward velocity when jump released
-        if (!jump_held && v.y < 0.0f) {
-            v.y *= p.jump_cut_mul;
-        }
-
-        // Write velocity back
-        body->set_velocity(v);
+        GameObject::update(delta_time);
     }
 
     void draw() override {
-        Color color = grounded ? GREEN : BLUE;
+        Color color = movement->grounded ? GREEN : BLUE;
         auto pos = body->get_position_pixels();
         DrawRectanglePro(
-            {  pos.x, pos.y, p.width_px, p.height_px },
-            { p.width_px / 2.0f, p.height_px / 2.0f },
+            {  pos.x, pos.y, p.width, p.height },
+            { p.width / 2.0f, p.height / 2.0f },
             0.0f,
             color
         );

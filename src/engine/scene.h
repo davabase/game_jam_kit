@@ -32,7 +32,7 @@ public:
 
     virtual void init() {}
     virtual void load() {}
-    virtual void update() {}
+    virtual void update(float delta_time) {}
     virtual void draw() {}
 };
 
@@ -100,7 +100,7 @@ public:
 
     virtual void update(float delta_time) {
         for (auto& component : components) {
-            component.second->update();
+            component.second->update(delta_time);
         }
     }
 
