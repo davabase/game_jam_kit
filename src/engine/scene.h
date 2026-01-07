@@ -31,9 +31,54 @@ public:
     virtual ~Component() = default;
 
     virtual void init() {}
-    virtual void load() {}
     virtual void update(float delta_time) {}
     virtual void draw() {}
+};
+
+/**
+ * For when you want a GameObject to have multiple of the same component.
+ */
+template <typename T>
+class MultiComponent : public Component {
+public:
+    std::unordered_map<std::string, std::unique_ptr<T>> components;
+
+    MultiComponent() {}
+    MultiComponent(std::unordered_map<std::string, std::unique_ptr<T>> components) : components(components) {}
+
+    void init() override {
+        for (auto& component : components) {
+            component.second->init();
+        }
+    }
+
+    void update(float delta_time) {
+        for (auto& component : components) {
+            component.second->update(delta_time);
+        }
+    }
+
+    void draw() override {
+        for (auto& component : components) {
+            component.second->draw();
+        }
+    }
+
+    void add_component(std::string name, std::unique_ptr<T> component) {
+        components[name] = std::move(component);
+    }
+
+    template <typename... TArgs>
+    T* add_component(std::string name, TArgs&&... args) {
+        auto new_component = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* component_ptr = new_component.get();
+        add_component(name, std::move(new_component));
+        return component_ptr;
+    }
+
+    T* get_component(std::string name) {
+        return components[name].get();
+    }
 };
 
 class GameObject {
@@ -89,12 +134,6 @@ public:
     virtual void init() {
         for (auto& component : components) {
             component.second->init();
-        }
-    }
-
-    virtual void load() {
-        for (auto& component : components) {
-            component.second->load();
         }
     }
 
@@ -202,12 +241,6 @@ public:
         init_services();
         for (auto& game_object : game_objects) {
             game_object->init();
-        }
-    }
-
-    virtual void load() {
-        for (auto& game_object : game_objects) {
-            game_object->load();
         }
     }
 

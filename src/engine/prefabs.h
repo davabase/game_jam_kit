@@ -702,6 +702,7 @@ public:
     float rotation = 0.0f;
     float scale = 1.0f;
     Color tint = WHITE;
+    bool enabled = true;
 
     SpriteComponent(std::string filename) : filename(filename) {}
 
@@ -714,6 +715,10 @@ public:
     }
 
     void draw() override {
+        if (!enabled) {
+            return;
+        }
+
         Rectangle source = {0, 0, (float)sprite.width, (float)sprite.height};
         Rectangle dest = {position.x, position.y, (float)sprite.width * scale, (float)sprite.height * scale};
         Vector2 origin = {sprite.width / 2.0f * scale, sprite.height / 2.0f * scale};
@@ -736,6 +741,10 @@ public:
     void set_tint(Color tint) {
         this->tint = tint;
     }
+
+    void set_enabled(bool enabled) {
+        this->enabled = enabled;
+    }
 };
 
 class SpriteBodyComponent : public SpriteComponent {
@@ -749,6 +758,10 @@ public:
     }
 
     void draw() override {
+        if (!enabled) {
+            return;
+        }
+
         auto pos = body->get_position_pixels();
         auto rotation = body->get_rotation();
         Rectangle source = {0, 0, (float)sprite.width, (float)sprite.height};
@@ -788,6 +801,10 @@ public:
     }
 
     void update(float delta_time) override {
+        if (!enabled) {
+            return;
+        }
+
         if (!play) {
             return;
         }
@@ -839,6 +856,10 @@ public:
     }
 
     void update(float delta_time) override {
+        if (!enabled) {
+            return;
+        }
+
         if (!play) {
             return;
         }
@@ -1152,6 +1173,11 @@ public:
 
         // add_component<SpriteBodyComponent>(body, "assets/character_green_idle.png");
         animation = add_component<AnimationBodyComponent>(body, std::vector<std::string>{"assets/character_green_walk_a.png", "assets/character_green_walk_b.png"}, 5.0f);
+        auto multi = add_component<MultiComponent<SpriteBodyComponent>>();
+        multi->add_component("walk", body, "assets/character_green_walk_a.png");
+
+        auto walk = multi->get_component("walk");
+        walk->set_enabled(false);
 
         GameObject::init();
     }
