@@ -1,6 +1,6 @@
 #pragma once
 
-#include "scene.h"
+#include "framework.h"
 #include "math_extensions.h"
 
 class PhysicsService : public Service {
