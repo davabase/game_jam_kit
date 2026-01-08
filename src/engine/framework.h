@@ -25,9 +25,19 @@ public:
     Component() = default;
     virtual ~Component() = default;
 
-    virtual void init() {}
-    virtual void update(float delta_time) {}
-    virtual void draw() {}
+    virtual void on_init() {}
+    virtual void on_update(float delta_time) {}
+    virtual void on_draw() {}
+
+    virtual void init() final {
+        on_init();
+    }
+    virtual void update(float delta_time) final {
+        on_update(delta_time);
+    }
+    virtual void draw() final {
+        on_draw();
+    }
 };
 
 /**
@@ -46,7 +56,7 @@ public:
         }
     }
 
-    void update(float delta_time) {
+    void update(float delta_time) override {
         for (auto& component : components) {
             component.second->update(delta_time);
         }
@@ -86,19 +96,26 @@ public:
     GameObject() = default;
     virtual ~GameObject() = default;
 
+    virtual void on_init() {}
+    virtual void on_update(float delta_time) {}
+    virtual void on_draw() {}
+
     virtual void init() {
+        on_init();
         for (auto& component : components) {
             component.second->init();
         }
     }
 
     virtual void update(float delta_time) {
+        on_update(delta_time);
         for (auto& component : components) {
             component.second->update(delta_time);
         }
     }
 
     virtual void draw() {
+        on_draw();
         for (auto& component : components) {
             component.second->draw();
         }
@@ -154,11 +171,23 @@ public:
     Service() = default;
     virtual ~Service() = default;
 
-    virtual void init() {
+    virtual void on_init() {}
+    virtual void on_update() {}
+    virtual void on_draw() {}
+
+    virtual void init() final {
+        if (is_init) {
+            return;
+        }
+        on_init();
         is_init = true;
     }
-    virtual void update() {}
-    virtual void draw() {}
+    virtual void update() final {
+        on_update();
+    }
+    virtual void draw() final {
+        on_draw();
+    }
 };
 
 template <typename T>
@@ -214,7 +243,12 @@ public:
     Manager() = default;
     virtual ~Manager() = default;
 
-    virtual void init() {
+    virtual void on_init() {}
+    virtual void init() final {
+        if (is_init) {
+            return;
+        }
+        on_init();
         is_init = true;
     }
 };
@@ -226,11 +260,11 @@ public:
 
     MultiManager() = default;
 
-    void init() override {
+    void on_init() override {
         for (auto& manager : managers) {
-            manager.second->init();
+            manager.second->on_init();
         }
-        Manager::init();
+        Manager::on_init();
     }
 
     void add_manager(std::string name, std::unique_ptr<T> manager) {
@@ -272,13 +306,10 @@ public:
         if (is_init) {
             return;
         }
-
         on_init_services();
 
         for (auto& service : services) {
-            if (!service.second->is_init) {
-                service.second->init();
-            }
+            service.second->init();
         }
 
         on_init();
@@ -391,9 +422,7 @@ public:
 
     void init() {
         for (auto& manager : managers) {
-            if (!manager.second->is_init) {
-                manager.second->init();
-            }
+            manager.second->init();
         }
     }
 
