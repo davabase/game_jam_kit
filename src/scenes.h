@@ -66,14 +66,14 @@ public:
         }
     }
 
-    void on_draw() override {
+    void draw_scene() override {
         auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto physics = get_service<PhysicsService>();
 
         // The scene needs to be rendered for each camera.
         camera->draw_begin();
-        Scene::on_draw();
+        Scene::draw_scene();
         debug.debug_draw(physics->world);
         auto local = camera->screen_to_world({0, 0}, GetMousePosition());
         Rectangle rec = {local.x - 10, local.y - 10, 20, 20};
@@ -81,7 +81,7 @@ public:
         camera->draw_end();
 
         camera2->draw_begin();
-        Scene::on_draw();
+        Scene::draw_scene();
         camera2->draw_end();
 
         // Draw the resulting views.

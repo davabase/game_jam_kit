@@ -90,21 +90,21 @@ public:
     virtual void update(float delta_time) {}
     virtual void draw() {}
 
-    virtual void on_init() {
+    virtual void init_object() {
         init();
         for (auto& component : components) {
             component.second->init();
         }
     }
 
-    virtual void on_update(float delta_time) {
+    virtual void update_object(float delta_time) {
         update(delta_time);
         for (auto& component : components) {
             component.second->update(delta_time);
         }
     }
 
-    virtual void on_draw() {
+    virtual void draw_object() {
         draw();
         for (auto& component : components) {
             component.second->draw();
@@ -165,7 +165,7 @@ public:
     virtual void update() {}
     virtual void draw() {}
 
-    virtual void on_init() final {
+    virtual void init_service() final {
         if (is_init) {
             return;
         }
@@ -180,11 +180,11 @@ public:
     std::unordered_map<std::string, std::unique_ptr<T>> services;
 
     MultiService() = default;
-    void on_init() override {
+    void init_service() override {
         for (auto& service : services) {
             service.second->init();
         }
-        Service::on_init();
+        Service::init_service();
     }
 
     void update() override {
@@ -228,7 +228,7 @@ public:
     virtual ~Manager() = default;
 
     virtual void init() {}
-    virtual void on_init() final {
+    virtual void init_manager() final {
         if (is_init) {
             return;
         }
@@ -246,7 +246,7 @@ public:
 
     void init() override {
         for (auto& manager : managers) {
-            manager.second->on_init();
+            manager.second->init_manager();
         }
         Manager::init();
     }
@@ -286,43 +286,43 @@ public:
     virtual void draw() {}
 
 
-    virtual void on_init() {
+    virtual void init_scene() {
         if (is_init) {
             return;
         }
         init_services();
 
         for (auto& service : services) {
-            service.second->on_init();
+            service.second->init_service();
         }
 
         init();
 
         for (auto& game_object : game_objects) {
-            game_object->on_init();
+            game_object->init_object();
         }
         is_init = true;
     }
 
-    virtual void on_update(float delta_time) {
+    virtual void update_scene(float delta_time) {
         update(delta_time);
 
         for (auto& game_object : game_objects) {
-            game_object->on_update(delta_time);
+            game_object->update_object(delta_time);
         }
         for (auto& service : services) {
             service.second->update();
         }
     }
 
-    virtual void on_draw() {
+    virtual void draw_scene() {
         draw();
 
         for (auto& service : services) {
             service.second->draw();
         }
         for (auto& game_object : game_objects) {
-            game_object->on_draw();
+            game_object->draw_object();
         }
     }
 
@@ -406,21 +406,21 @@ public:
 
     void init() {
         for (auto& manager : managers) {
-            manager.second->on_init();
+            manager.second->init_manager();
         }
     }
 
     void update(float delta_time) {
         // TODO: When do we init scenes?
-        current_scene->on_init();
+        current_scene->init_scene();
 
         if (current_scene) {
-            current_scene->on_update(delta_time);
+            current_scene->update_scene(delta_time);
 
             BeginDrawing();
             ClearBackground(RAYWHITE);
 
-            current_scene->on_draw();
+            current_scene->draw_scene();
 
             EndDrawing();
         }
