@@ -24,14 +24,14 @@ public:
         }
     }
 
-    void on_init() override {
+    void init() override {
         b2WorldDef world_def = b2DefaultWorldDef();
         world_def.gravity = gravity;
         world_def.contactHertz = 120;
         world = b2CreateWorld(&world_def);
     }
 
-    void on_update() override {
+    void update() override {
         if (!b2World_IsValid(world)) {
             return;
         }
@@ -110,7 +110,7 @@ public:
         }
     }
 
-    void on_init() override {
+    void init() override {
         physics = owner->scene->get_service<PhysicsService>();
         if (build) {
             build(*this);
@@ -261,7 +261,7 @@ public:
         }
     }
 
-    void on_init() override {
+    void init() override {
         if (!FileExists(project_file.c_str())) {
             TraceLog(LOG_FATAL, "LDtk file not found: %s", project_file.c_str());
         }
@@ -479,7 +479,7 @@ public:
         }
     }
 
-    void on_draw() override {
+    void draw() override {
         for (const auto& renderer : renderers) {
             Rectangle src = {
                 0,
@@ -711,11 +711,11 @@ public:
         UnloadTexture(sprite);
     }
 
-    void on_init() override {
+    void init() override {
         sprite = LoadTexture(filename.c_str());
     }
 
-    void on_draw() override {
+    void draw() override {
         if (!enabled) {
             return;
         }
@@ -864,13 +864,13 @@ public:
 
     AnimationController(BodyComponent* body) : body(body) {}
 
-    void on_update(float delta_time) override {
+    void update(float delta_time) override {
         if (current_animation) {
             current_animation->update(delta_time);
         }
     }
 
-    void on_draw() override {
+    void draw() override {
         if (body) {
             position = body->get_position_pixels();
             rotation = body->get_rotation();
@@ -970,7 +970,7 @@ public:
 
     StaticBox(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
 
-    void on_init() override {
+    void init() override {
         auto physics = scene->get_service<PhysicsService>();
         const float pixels_to_meters = physics->pixels_to_meters;
         auto world = physics->world;
@@ -987,7 +987,7 @@ public:
         add_component<BodyComponent>(body);
     }
 
-    void on_draw() override {
+    void draw() override {
         DrawRectangle(x - width / 2.0f, y - height / 2.0f, width, height, RED);
     }
 };
@@ -1004,7 +1004,7 @@ public:
     DynamicBox(Vector2 position, Vector2 size, float rotation = 0)
         : x(position.x), y(position.y), width(size.x), height(size.y), rot_deg(rotation) {}
 
-    void on_init() override {
+    void init() override {
         physics = scene->get_service<PhysicsService>();
         const float pixels_to_meters = physics->pixels_to_meters;
         auto world = physics->world;
@@ -1027,7 +1027,7 @@ public:
         add_component<SpriteComponent>(body_component, "assets/character_green_idle.png");
     }
 
-    void on_draw() override {
+    void draw() override {
         float meters_to_pixels = physics->meters_to_pixels;
         b2Vec2 pos = b2Body_GetPosition(body);
         b2Rot rot = b2Body_GetRotation(body);
@@ -1073,7 +1073,7 @@ public:
         offset_top(offset_top),
         offset_bottom(offset_bottom) {}
 
-    void on_init() override {
+    void init() override {
         camera.zoom = 1.0f;
         camera.offset = {size.x / 2.0f, size.y / 2.0f};
         camera.rotation = 0.0f;
@@ -1081,7 +1081,7 @@ public:
         camera.target = target;
     }
 
-    void on_update(float dt) override {
+    void update(float dt) override {
         // Desired camera.target after applying deadzone.
         Vector2 desired = camera.target;
 
@@ -1198,9 +1198,9 @@ public:
         UnloadRenderTexture(texture);
     }
 
-    void on_init() override {
+    void init() override {
         texture = LoadRenderTexture(size.x, size.y);
-        CameraObject::on_init();
+        CameraObject::init();
     }
 
     void draw_begin() {
@@ -1281,7 +1281,7 @@ public:
     TextComponent(FontManager* font_manager, std::string text, std::string font_name = "default", int font_size = 20, Color color = WHITE)
         : font_manager(font_manager), text(text), font_name(font_name), font_size(font_size), color(color) {}
 
-    void on_draw() override {
+    void draw() override {
         DrawTextEx(font_manager->get_font(font_name), text.c_str(), position, static_cast<float>(font_size), 1.0f, color);
     }
 };
@@ -1324,12 +1324,12 @@ public:
 
     MovementComponent(MovementParams p) : p(p) {}
 
-    void on_init() override {
+    void init() override {
         physics = owner->scene->get_service<PhysicsService>();
         body = owner->get_component<BodyComponent>();
     }
 
-    void on_update(float delta_time) override {
+    void update(float delta_time) override {
         if (!b2Body_IsValid(body->id)) {
             return;
         }
@@ -1457,7 +1457,7 @@ public:
 
     Character(CharacterParams p) : p(p) {}
 
-    void on_init() override {
+    void init() override {
         physics = scene->get_service<PhysicsService>();
 
         body = add_component<BodyComponent>([=](BodyComponent& b){
@@ -1497,7 +1497,7 @@ public:
         text_component->position = {p.position.x, p.position.y - p.height / 2.0f - 20.0f};
     }
 
-    void on_update(float delta_time) override {
+    void update(float delta_time) override {
         int gamepad = 0;
         float deadzone = 0.1f;
 
@@ -1531,7 +1531,7 @@ public:
         movement->set_input(move_x, jump_pressed, jump_held);
     }
 
-    void on_draw() override {
+    void draw() override {
         Color color = movement->grounded ? GREEN : BLUE;
         auto pos = body->get_position_pixels();
         DrawRectanglePro(

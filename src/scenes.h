@@ -7,13 +7,13 @@ class Playground : public Scene {
 public:
     DebugRenderer debug;
 
-    void on_init_services() override {
+    void init_services() override {
         add_service<PhysicsService>();
         std::vector<std::string> collision_names = {"walls"};
         add_service<LDtkService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
     }
 
-    void on_init() override {
+    void init() override {
         auto level = get_service<LDtkService>();
         auto player_entity = level->get_entity_by_name("Player");
         if (!player_entity) {
@@ -49,7 +49,7 @@ public:
         debug.init();
     }
 
-    void on_update(float delta_time) override {
+    void update(float delta_time) override {
         auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
@@ -66,14 +66,14 @@ public:
         }
     }
 
-    void draw() override {
+    void on_draw() override {
         auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto physics = get_service<PhysicsService>();
 
         // The scene needs to be rendered for each camera.
         camera->draw_begin();
-        Scene::draw();
+        Scene::on_draw();
         debug.debug_draw(physics->world);
         auto local = camera->screen_to_world({0, 0}, GetMousePosition());
         Rectangle rec = {local.x - 10, local.y - 10, 20, 20};
@@ -81,7 +81,7 @@ public:
         camera->draw_end();
 
         camera2->draw_begin();
-        Scene::draw();
+        Scene::on_draw();
         camera2->draw_end();
 
         // Draw the resulting views.
