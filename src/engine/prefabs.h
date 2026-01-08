@@ -234,7 +234,7 @@ struct EdgeHash {
     }
 };
 
-class LDtkService : public Service {
+class LevelService : public Service {
 public:
     ldtk::Project project;
     std::string project_file;
@@ -246,10 +246,10 @@ public:
 
     PhysicsService* physics;
 
-    LDtkService(std::string project_file, std::string level_name, std::vector<std::string> collision_names, float scale = 4.0f) :
+    LevelService(std::string project_file, std::string level_name, std::vector<std::string> collision_names, float scale = 4.0f) :
         project_file(project_file), level_name(level_name), collision_names(collision_names), scale(scale) {}
 
-    virtual ~LDtkService() {
+    virtual ~LevelService() {
         for (auto& renderer : renderers) {
             UnloadRenderTexture(renderer);
         }

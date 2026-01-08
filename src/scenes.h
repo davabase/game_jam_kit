@@ -10,11 +10,11 @@ public:
     void init_services() override {
         add_service<PhysicsService>();
         std::vector<std::string> collision_names = {"walls"};
-        add_service<LDtkService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
+        add_service<LevelService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
     }
 
     void init() override {
-        auto level = get_service<LDtkService>();
+        auto level = get_service<LevelService>();
         auto player_entity = level->get_entity_by_name("Player");
         if (!player_entity) {
             assert(false);
