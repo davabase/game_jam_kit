@@ -7,13 +7,13 @@ class Playground : public Scene {
 public:
     DebugRenderer debug;
 
-    void init() override {
+    void on_init_services() override {
         add_service<PhysicsService>();
         std::vector<std::string> collision_names = {"walls"};
         add_service<LDtkService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
+    }
 
-        init_services();
-
+    void on_init() override {
         auto level = get_service<LDtkService>();
         auto player_entity = level->get_entity_by_name("Player");
         if (!player_entity) {
@@ -47,11 +47,9 @@ public:
         split_camera2->add_tag("camera");
 
         debug.init();
-
-        Scene::init();
     }
 
-    void update(float delta_time) override {
+    void on_update(float delta_time) override {
         auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
@@ -63,7 +61,9 @@ public:
         Rectangle rec = {local.x - 10, local.y - 10, 20, 20};
         auto contacts = physics->rectangle_overlap(rec, 0);
 
-        Scene::update(delta_time);
+        if (IsKeyPressed(KEY_SPACE)) {
+            game->go_to_scene_next();
+        }
     }
 
     void draw() override {

@@ -24,6 +24,7 @@ int main(int argc, char** argv) {
     game.init();
 
     game.add_scene<Playground>("playground");
+    game.add_scene<Playground>("playground2");
 
     // Main game loop
     #ifdef __EMSCRIPTEN__

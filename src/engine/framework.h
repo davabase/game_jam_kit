@@ -262,8 +262,27 @@ public:
     Scene() = default;
     virtual ~Scene() = default;
 
+    virtual void on_init_services() {}
+    virtual void on_init() {}
+    virtual void on_update(float delta_time) {}
+    virtual void on_draw() {}
+
+
     virtual void init() {
-        init_services();
+        if (is_init) {
+            return;
+        }
+
+        on_init_services();
+
+        for (auto& service : services) {
+            if (!service.second->is_init) {
+                service.second->init();
+            }
+        }
+
+        on_init();
+
         for (auto& game_object : game_objects) {
             game_object->init();
         }
@@ -271,6 +290,8 @@ public:
     }
 
     virtual void update(float delta_time) {
+        on_update(delta_time);
+
         for (auto& game_object : game_objects) {
             game_object->update(delta_time);
         }
@@ -280,6 +301,8 @@ public:
     }
 
     virtual void draw() {
+        on_draw();
+
         for (auto& service : services) {
             service.second->draw();
         }
@@ -288,13 +311,7 @@ public:
         }
     }
 
-    void init_services() {
-        for (auto& service : services) {
-            if (!service.second->is_init) {
-                service.second->init();
-            }
-        }
-    }
+    virtual void on_transition() {}
 
     void add_game_object(std::unique_ptr<GameObject> game_object) {
         game_object->scene = this;
@@ -382,25 +399,23 @@ public:
 
     void update(float delta_time) {
         // TODO: When do we init scenes?
-        if (!current_scene->is_init) {
-            current_scene->init();
-        }
+        current_scene->init();
 
         if (current_scene) {
             current_scene->update(delta_time);
-            // Start drawing
-            BeginDrawing();
 
+            BeginDrawing();
             ClearBackground(RAYWHITE);
-            // Draw the scene
+
             current_scene->draw();
 
-            // End drawing
             EndDrawing();
         }
+
         // Switch scenes if needed.
         if (next_scene) {
             current_scene = next_scene;
+            current_scene->on_transition();
             next_scene = nullptr;
         }
     }
