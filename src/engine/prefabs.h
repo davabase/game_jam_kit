@@ -696,6 +696,7 @@ public:
 class SpriteComponent : public Component {
 public:
     std::string filename;
+    BodyComponent* body = nullptr;
 
     Texture2D sprite;
     Vector2 position = {0, 0};
@@ -705,6 +706,7 @@ public:
     bool enabled = true;
 
     SpriteComponent(std::string filename) : filename(filename) {}
+    SpriteComponent(BodyComponent* body, std::string filename) : body(body), filename(filename) {}
 
     ~SpriteComponent() {
         UnloadTexture(sprite);
@@ -717,6 +719,11 @@ public:
     void draw() override {
         if (!enabled) {
             return;
+        }
+
+        if (body) {
+            position = body->get_position_pixels();
+            rotation = body->get_rotation();
         }
 
         Rectangle source = {0, 0, (float)sprite.width, (float)sprite.height};
@@ -747,138 +754,213 @@ public:
     }
 };
 
-class SpriteBodyComponent : public SpriteComponent {
+class Animation {
 public:
-    BodyComponent* body;
+    std::vector<Texture2D> frames;
+    float fps = 15.0f;
+    float frame_timer = 0.0f;
+    bool loop = true;
 
-    SpriteBodyComponent(BodyComponent* body, std::string filename) : body(body), SpriteComponent(filename) {}
+    int current_frame = 0;
+    bool playing = true;
+    bool enabled = true;
 
-    ~SpriteBodyComponent() {
-        UnloadTexture(sprite);
+    Animation(const std::vector<Texture2D>& frames, float fps = 15.0f, bool loop = true) : frames(frames), fps(fps), frame_timer(1.0f / fps), loop(loop) {}
+
+    Animation(const std::vector<std::string>& filenames, float fps = 15.0f, bool loop = true) : fps(fps), frame_timer(1.0f / fps), loop(loop) {
+        for (const auto& filename : filenames) {
+            frames.push_back(LoadTexture(filename.c_str()));
+        }
+    }
+
+    ~Animation() {
+        for (auto& frame : frames) {
+            UnloadTexture(frame);
+        }
+    }
+
+    void update(float delta_time) {
+        if (frames.empty()) {
+            return;
+        }
+        if (!playing || !enabled) {
+            return;
+        }
+
+        frame_timer -= delta_time;
+        if (frame_timer <= 0.0f) {
+            frame_timer = 1.0f / fps;
+            current_frame++;
+        }
+
+        if (current_frame > frames.size() - 1) {
+            if (loop)
+                current_frame = 0;
+            else {
+                current_frame = frames.size() - 1;
+            }
+        }
+    }
+
+    void draw(Vector2 position, float rotation = 0.0f, Color tint = WHITE) {
+        if (!enabled) {
+            return;
+        }
+
+        auto sprite = frames[current_frame];
+        DrawTexturePro(
+            sprite,
+            { 0.0f, 0.0f, static_cast<float>(sprite.width), static_cast<float>(sprite.height) },
+            { position.x, position.y, static_cast<float>(sprite.width), static_cast<float>(sprite.height) },
+            { static_cast<float>(sprite.width) / 2.0f, static_cast<float>(sprite.height) / 2.0f },
+            rotation,
+            tint
+        );
+    }
+
+    void draw(Vector2 position, Vector2 origin, float rotation = 0.0f, float scale = 1.0f, bool flip_x = false, bool flip_y = false, Color tint = WHITE) {
+        if (!enabled) {
+            return;
+        }
+
+        auto sprite = frames[current_frame];
+        DrawTexturePro(
+            sprite,
+            { 0.0f, 0.0f, static_cast<float>(sprite.width) * (flip_x ? -1.0f : 1.0f), static_cast<float>(sprite.height) * (flip_y ? -1.0f : 1.0f) },
+            { position.x, position.y, static_cast<float>(sprite.width) * scale, static_cast<float>(sprite.height) * scale },
+            origin * scale,
+            rotation,
+            tint
+        );
+    }
+
+    void play() {
+        playing = true;
+    }
+
+    void pause() {
+        playing = false;
+    }
+
+    void stop() {
+        playing = false;
+        frame_timer = 1.0f / fps;
+        current_frame = 0;
+    }
+};
+
+class AnimationController : public Component {
+public:
+    std::unordered_map<std::string, std::unique_ptr<Animation>> animations;
+    Animation* current_animation = nullptr;
+    Vector2 position = {0.0f, 0.0f};
+    float rotation = 0.0f;
+    Vector2 origin = {0.0f, 0.0f};
+    float scale = 1.0f;
+    bool flip_x = false;
+    bool flip_y = false;
+    BodyComponent* body = nullptr;
+
+    AnimationController() = default;
+
+    AnimationController(BodyComponent* body) : body(body) {}
+
+    void update(float delta_time) override {
+        if (current_animation) {
+            current_animation->update(delta_time);
+        }
     }
 
     void draw() override {
-        if (!enabled) {
-            return;
+        if (body) {
+            position = body->get_position_pixels();
+            rotation = body->get_rotation();
         }
 
-        auto pos = body->get_position_pixels();
-        auto rotation = body->get_rotation();
-        Rectangle source = {0, 0, (float)sprite.width, (float)sprite.height};
-        Rectangle dest = {pos.x, pos.y, (float)sprite.width * scale, (float)sprite.height * scale};
-        Vector2 origin = {sprite.width / 2.0f * scale, sprite.height / 2.0f * scale};
-
-        DrawTexturePro(sprite, source, dest, origin, rotation, tint);
-    }
-};
-
-class AnimationComponent : public SpriteComponent {
-public:
-    std::vector<std::string> filenames;
-    float fps = 0.0f;
-    bool loop = true;
-
-    std::vector<Texture2D> frames;
-    int current_frame = 0;
-    float frame_timer = 0.0f;
-    bool play = true;
-
-    AnimationComponent(std::vector<std::string> filenames, float fps, bool loop = true) : filenames(filenames), fps(fps), loop(loop), SpriteComponent(filenames[0]) {}
-
-    ~AnimationComponent() {
-        for (auto& frame : frames) {
-            UnloadTexture(frame);
+        if (current_animation) {
+            current_animation->draw(position, origin, rotation, scale, flip_x, flip_y);
         }
     }
 
-    void init() override {
-        for (auto& filename: filenames) {
-            frames.push_back(LoadTexture(filename.c_str()));
+    void add_animation(const std::string& name, std::unique_ptr<Animation> animation) {
+        animations[name] = std::move(animation);
+        if (!current_animation) {
+            current_animation = animations[name].get();
         }
-
-        frame_timer = 1.0f / fps;
-        sprite = frames[0];
     }
 
-    void update(float delta_time) override {
-        if (!enabled) {
-            return;
-        }
+    template <typename... TArgs>
+    Animation* add_animation(const std::string& name, TArgs&&... args) {
+        auto new_animation = std::make_unique<Animation>(std::forward<TArgs>(args)...);
+        Animation* animation_ptr = new_animation.get();
+        add_animation(name, std::move(new_animation));
+        return animation_ptr;
+    }
 
-        if (!play) {
-            return;
-        }
+    Animation* get_animation(const std::string& name) {
+        return animations[name].get();
+    }
 
-        frame_timer = frame_timer - delta_time;
-        if (frame_timer <= 0.0f) {
-            frame_timer = 1.0f / fps;
-            current_frame++;
+    void play() {
+        if (current_animation) {
+            current_animation->play();
         }
+    }
 
-        if (current_frame > frames.size() - 1) {
-            current_frame = 0;
+    void play(const std::string& name) {
+        auto it = animations.find(name);
+        if (it != animations.end()) {
+            current_animation = it->second.get();
+            current_animation->play();
+            auto sprite = current_animation->frames[current_animation->current_frame];
+            origin = { sprite.width / 2.0f, sprite.height / 2.0f };
         }
+    }
 
-        sprite = frames[current_frame];
+    void pause() {
+        if (current_animation) {
+            current_animation->pause();
+        }
     }
 
     void set_play(bool play) {
-        this->play = play;
-    }
-};
-
-class AnimationBodyComponent : public SpriteBodyComponent {
-public:
-    std::vector<std::string> filenames;
-    float fps = 0.0f;
-    bool loop = true;
-
-    std::vector<Texture2D> frames;
-    int current_frame = 0;
-    float frame_timer = 0.0f;
-    bool play = true;
-
-    AnimationBodyComponent(BodyComponent* body, std::vector<std::string> filenames, float fps, bool loop = true) : filenames(filenames), fps(fps), loop(loop), SpriteBodyComponent(body, filenames[0]) {}
-
-    ~AnimationBodyComponent() {
-        for (auto& frame : frames) {
-            UnloadTexture(frame);
+        if (current_animation) {
+            if (play) {
+                current_animation->play();
+            } else {
+                current_animation->pause();
+            }
         }
     }
 
-    void init() override {
-        for (auto& filename: filenames) {
-            frames.push_back(LoadTexture(filename.c_str()));
+    void stop() {
+        if (current_animation) {
+            current_animation->stop();
         }
-
-        frame_timer = 1.0f / fps;
-        sprite = frames[0];
     }
 
-    void update(float delta_time) override {
-        if (!enabled) {
-            return;
-        }
-
-        if (!play) {
-            return;
-        }
-
-        frame_timer = frame_timer - delta_time;
-        if (frame_timer <= 0.0f) {
-            frame_timer = 1.0f / fps;
-            current_frame++;
-        }
-
-        if (current_frame > frames.size() - 1) {
-            current_frame = 0;
-        }
-
-        sprite = frames[current_frame];
+    void set_position(Vector2 pos) {
+        position = pos;
     }
 
-    void set_play(bool play) {
-        this->play = play;
+    void set_rotation(float rot) {
+        rotation = rot;
+    }
+
+    void set_origin(Vector2 orig) {
+        origin = orig;
+    }
+
+    void set_scale(float s) {
+        scale = s;
+    }
+
+    void set_flip_x(bool fx) {
+        flip_x = fx;
+    }
+
+    void set_flip_y(bool fy) {
+        flip_y = fy;
     }
 };
 
@@ -945,7 +1027,7 @@ public:
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
 
         auto body_component = add_component<BodyComponent>(body);
-        add_component<SpriteBodyComponent>(body_component, "assets/character_green_idle.png");
+        add_component<SpriteComponent>(body_component, "assets/character_green_idle.png");
 
         GameObject::init();
     }
@@ -1131,7 +1213,7 @@ public:
     PhysicsService* physics;
     BodyComponent* body;
     MovementComponent* movement;
-    AnimationBodyComponent* animation;
+    AnimationController* animation;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -1171,13 +1253,11 @@ public:
         mp.height = p.height;
         movement = add_component<MovementComponent>(mp);
 
-        // add_component<SpriteBodyComponent>(body, "assets/character_green_idle.png");
-        animation = add_component<AnimationBodyComponent>(body, std::vector<std::string>{"assets/character_green_walk_a.png", "assets/character_green_walk_b.png"}, 5.0f);
-        auto multi = add_component<MultiComponent<SpriteBodyComponent>>();
-        multi->add_component("walk", body, "assets/character_green_walk_a.png");
-
-        auto walk = multi->get_component("walk");
-        walk->set_enabled(false);
+        animation = add_component<AnimationController>(body);
+        animation->add_animation("idle", std::vector<std::string>{"assets/character_green_idle.png"}, 1.0f);
+        animation->add_animation("walk", std::vector<std::string>{"assets/character_green_walk_a.png", "assets/character_green_walk_b.png"}, 5.0f);
+        animation->play("walk");
+        animation->set_scale(0.35f);
 
         GameObject::init();
     }
@@ -1200,7 +1280,18 @@ public:
         else if (IsKeyDown(KEY_A) || IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
             move_x = -1.0f;
         }
-        animation->set_play(move_x != 0);
+
+        if (move_x < 0.0f) {
+            animation->set_flip_x(true);
+        } else if (move_x > 0.0f) {
+            animation->set_flip_x(false);
+        }
+        if (fabsf(move_x) > 0.1f) {
+            animation->play("walk");
+        }
+        else {
+            animation->play("idle");
+        }
 
         movement->set_input(move_x, jump_pressed, jump_held);
 
