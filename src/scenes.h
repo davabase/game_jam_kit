@@ -7,7 +7,7 @@ class Playground : public Scene {
 public:
     DebugRenderer debug;
 
-    void init(ManagerProvider* manager_provider) override {
+    void init() override {
         add_service<PhysicsService>();
         std::vector<std::string> collision_names = {"walls"};
         add_service<LDtkService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
@@ -48,7 +48,7 @@ public:
 
         debug.init();
 
-        Scene::init(manager_provider);
+        Scene::init();
     }
 
     void update(float delta_time) override {

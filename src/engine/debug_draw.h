@@ -216,7 +216,7 @@ static void DrawString(b2Vec2 p, const char* s, b2HexColor color, void* context)
     DrawText(s, (int)(p.x * ctx->meters_to_pixels), (int)(p.y * ctx->meters_to_pixels), 10, ToRaylibColor(color));
 }
 
-
+// TODO: Make this a component or service?
 struct DebugRenderer
 {
     DebugDrawCtx ctx;

@@ -4,21 +4,11 @@
 #include <emscripten/emscripten.h>
 #endif
 
-Playground scene;
+Game game;
 
 void update() {
     float delta_time = GetFrameTime();
-    scene.update(delta_time);
-
-    // Start drawing
-    BeginDrawing();
-
-    ClearBackground(RAYWHITE);
-    // Draw the scene
-    scene.draw();
-
-    // End drawing
-    EndDrawing();
+    game.update(delta_time);
 }
 
 int main(int argc, char** argv) {
@@ -28,13 +18,12 @@ int main(int argc, char** argv) {
     InitWindow(screen_width, screen_height, "Game Jam Kit");
     SetTargetFPS(60);
 
-    auto manager_provider = std::make_unique<ManagerProvider>();
-    auto font_manager = manager_provider->add_manager<FontManager>();
+    auto font_manager = game.add_manager<FontManager>();
     font_manager->load_font("Roboto", "assets/Roboto.ttf", 64);
     font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
-    manager_provider->init();
+    game.init();
 
-    scene.init(manager_provider.get());
+    game.add_scene<Playground>("playground");
 
     // Main game loop
     #ifdef __EMSCRIPTEN__

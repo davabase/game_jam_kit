@@ -16,6 +16,7 @@
 // Forward declarations.
 class GameObject;
 class Scene;
+class Game;
 
 class Component {
 public:
@@ -251,73 +252,22 @@ public:
     }
 };
 
-class ManagerProvider {
-public:
-    std::unordered_map<std::type_index, std::unique_ptr<Manager>> managers;
-    bool is_init = false;
-
-    ManagerProvider() = default;
-    ~ManagerProvider() = default;
-
-    void init() {
-        for (auto& manager : managers) {
-            if (!manager.second->is_init) {
-                manager.second->init();
-            }
-        }
-        is_init = true;
-    }
-
-    template <typename T>
-    void add_manager(std::unique_ptr<T> manager) {
-        auto [it, inserted] = managers.emplace(std::type_index(typeid(T)), std::move(manager));
-        if (!inserted) {
-            TraceLog(LOG_ERROR, "Duplicate manager added: %s", typeid(T).name());
-        }
-    }
-
-    template <typename T, typename... TArgs>
-    T* add_manager(TArgs&&... args) {
-        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
-        auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
-        T* manager_ptr = new_manager.get();
-        add_manager<T>(std::move(new_manager));
-        return manager_ptr;
-    }
-
-    template <typename T>
-    T* get_manager() {
-        auto it = managers.find(std::type_index(typeid(T)));
-        if (it != managers.end()) {
-            auto manager = it->second.get();
-            if (!manager->is_init) {
-                TraceLog(LOG_ERROR, "Manager not initialized: %s", typeid(T).name());
-            }
-            return static_cast<T*>(manager);
-        }
-        TraceLog(LOG_FATAL, "Manager of requested type not found: %s", typeid(T).name());
-        return nullptr;
-    }
-};
-
 class Scene {
 public:
-    ManagerProvider* manager_provider = nullptr;
     std::vector<std::unique_ptr<GameObject>> game_objects;
     std::unordered_map<std::type_index, std::unique_ptr<Service>> services;
+    Game* game = nullptr;
+    bool is_init = false;
 
     Scene() = default;
     virtual ~Scene() = default;
 
-    virtual void init(ManagerProvider* manager_provider = nullptr) {
-        if (manager_provider && !manager_provider->is_init) {
-            TraceLog(LOG_FATAL, "ManagerProvider not initialized.");
-        }
-        this->manager_provider = manager_provider;
+    virtual void init() {
         init_services();
         for (auto& game_object : game_objects) {
             game_object->init();
         }
+        is_init = true;
     }
 
     virtual void update(float delta_time) {
@@ -395,10 +345,10 @@ public:
 
     template <typename T>
     T* get_manager() {
-        if (!manager_provider) {
-            TraceLog(LOG_FATAL, "No ManagerProvider assigned to scene.");
+        if (!game) {
+            TraceLog(LOG_FATAL, "No Game assigned to scene.");
         }
-        return manager_provider->get_manager<T>();
+        return game->get_manager<T>();
     }
 
     std::vector<GameObject*> get_game_objects_with_tag(const std::string& tag) {
@@ -409,5 +359,152 @@ public:
             }
         }
         return tagged_objects;
+    }
+};
+
+class Game {
+public:
+    std::unordered_map<std::type_index, std::unique_ptr<Manager>> managers;
+    std::map<std::string, std::unique_ptr<Scene>> scenes;
+    Scene* current_scene = nullptr;
+    Scene* next_scene = nullptr;
+
+    Game() = default;
+    ~Game() = default;
+
+    void init() {
+        for (auto& manager : managers) {
+            if (!manager.second->is_init) {
+                manager.second->init();
+            }
+        }
+    }
+
+    void update(float delta_time) {
+        // TODO: When do we init scenes?
+        if (!current_scene->is_init) {
+            current_scene->init();
+        }
+
+        if (current_scene) {
+            current_scene->update(delta_time);
+            // Start drawing
+            BeginDrawing();
+
+            ClearBackground(RAYWHITE);
+            // Draw the scene
+            current_scene->draw();
+
+            // End drawing
+            EndDrawing();
+        }
+        // Switch scenes if needed.
+        if (next_scene) {
+            current_scene = next_scene;
+            next_scene = nullptr;
+        }
+    }
+
+    template <typename T>
+    void add_manager(std::unique_ptr<T> manager) {
+        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
+        auto [it, inserted] = managers.emplace(std::type_index(typeid(T)), std::move(manager));
+        if (!inserted) {
+            TraceLog(LOG_ERROR, "Duplicate manager added: %s", typeid(T).name());
+        }
+    }
+
+    template <typename T, typename... TArgs>
+    T* add_manager(TArgs&&... args) {
+        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
+        auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* manager_ptr = new_manager.get();
+        add_manager<T>(std::move(new_manager));
+        return manager_ptr;
+    }
+
+    template <typename T>
+    T* get_manager() {
+        auto it = managers.find(std::type_index(typeid(T)));
+        if (it != managers.end()) {
+            auto manager = it->second.get();
+            if (!manager->is_init) {
+                TraceLog(LOG_ERROR, "Manager not initialized: %s", typeid(T).name());
+            }
+            return static_cast<T*>(manager);
+        }
+        TraceLog(LOG_FATAL, "Manager of requested type not found: %s", typeid(T).name());
+        return nullptr;
+    }
+
+    void add_scene(std::string name, std::unique_ptr<Scene> scene) {
+        scenes[name] = std::move(scene);
+        scenes[name]->game = this;
+        if (!current_scene) {
+            current_scene = scenes[name].get();
+        }
+    }
+
+    template <typename T, typename... TArgs>
+    T* add_scene(std::string name, TArgs&&... args) {
+        static_assert(std::is_base_of<Scene, T>::value, "T must derive from Scene");
+        auto new_scene = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* scene_ptr = new_scene.get();
+        add_scene(name, std::move(new_scene));
+        if (!current_scene) {
+            current_scene = scene_ptr;
+        }
+        return scene_ptr;
+    }
+
+    Scene* go_to_scene(const std::string& name) {
+        auto it = scenes.find(name);
+        if (it != scenes.end()) {
+            next_scene = it->second.get();
+        } else {
+            TraceLog(LOG_ERROR, "Scene not found: %s", name.c_str());
+        }
+        return next_scene;
+    }
+
+    Scene* go_to_scene_next() {
+        // Find the next scene in the map.
+        if (current_scene) {
+            auto it = scenes.begin();;
+            while (it != scenes.end()) {
+                if (it->second.get() == current_scene) {
+                    ++it;
+                    break;
+                }
+                ++it;
+            }
+            if (it != scenes.end()) {
+                next_scene = it->second.get();
+            } else {
+                // Loop back to the first scene.
+                next_scene = scenes.begin()->second.get();
+            }
+        }
+        return next_scene;
+    }
+
+    Scene* go_to_scene_previous() {
+        // Find the previous scene in the map.
+        if (current_scene) {
+            auto it = scenes.end();
+            while (it != scenes.begin()) {
+                --it;
+                if (it->second.get() == current_scene) {
+                    break;
+                }
+            }
+            if (it != scenes.begin()) {
+                next_scene = it->second.get();
+            } else {
+                // Loop back to the last scene.
+                next_scene = std::prev(scenes.end())->second.get();
+            }
+        }
+        return next_scene;
     }
 };
