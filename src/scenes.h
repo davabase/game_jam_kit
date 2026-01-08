@@ -1,12 +1,13 @@
 #pragma once
 
 #include "engine/prefabs.h"
+#include "engine/debug_draw.h"
 
 class Playground : public Scene {
 public:
     DebugRenderer debug;
 
-    void init() override {
+    void init(ManagerProvider* manager_provider) override {
         add_service<PhysicsService>();
         std::vector<std::string> collision_names = {"walls"};
         add_service<LDtkService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
@@ -47,7 +48,7 @@ public:
 
         debug.init();
 
-        Scene::init();
+        Scene::init(manager_provider);
     }
 
     void update(float delta_time) override {

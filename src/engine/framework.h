@@ -1,21 +1,15 @@
 #pragma once
 
-#include <assert.h>
 #include <memory>
+#include <string>
 #include <typeindex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include <box2d/box2d.h>
-#include <LDtkLoader/Project.hpp>
 #include <raylib.h>
 
-#include "debug_draw.h"
-#include "raycasts.h"
-
 // TODO: Write docs with principles. Use get_service, get_game_objects_*, and get_component in init and store references. This way if a service, object, or component does not exist it will cause a crash during init.
-// TODO: Make Manager class, like a global Service that survives across Scenes. Make Scene::init() take map of managers.
 // TODO: Make WindowManager to store window size and init, etc. AudioManager for loading and playing sounds. SpriteManager for loading sprites.
 // TODO: Move prebuilt Components, GameObjects, and Services to prefabs/ folder. Move ECS stuff and raycast helpers to utils/ folder.
 
@@ -44,7 +38,6 @@ public:
     std::unordered_map<std::string, std::unique_ptr<T>> components;
 
     MultiComponent() {}
-    MultiComponent(std::unordered_map<std::string, std::unique_ptr<T>> components) : components(components) {}
 
     void init() override {
         for (auto& component : components) {
@@ -65,11 +58,13 @@ public:
     }
 
     void add_component(std::string name, std::unique_ptr<T> component) {
+        static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         components[name] = std::move(component);
     }
 
     template <typename... TArgs>
     T* add_component(std::string name, TArgs&&... args) {
+        static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         auto new_component = std::make_unique<T>(std::forward<TArgs>(args)...);
         T* component_ptr = new_component.get();
         add_component(name, std::move(new_component));
@@ -89,6 +84,24 @@ public:
 
     GameObject() = default;
     virtual ~GameObject() = default;
+
+    virtual void init() {
+        for (auto& component : components) {
+            component.second->init();
+        }
+    }
+
+    virtual void update(float delta_time) {
+        for (auto& component : components) {
+            component.second->update(delta_time);
+        }
+    }
+
+    virtual void draw() {
+        for (auto& component : components) {
+            component.second->draw();
+        }
+    }
 
     template <typename T>
     void add_component(std::unique_ptr<T> component) {
@@ -130,24 +143,6 @@ public:
     bool has_tag(const std::string& tag) const {
         return tags.find(tag) != tags.end();
     }
-
-    virtual void init() {
-        for (auto& component : components) {
-            component.second->init();
-        }
-    }
-
-    virtual void update(float delta_time) {
-        for (auto& component : components) {
-            component.second->update(delta_time);
-        }
-    }
-
-    virtual void draw() {
-        for (auto& component : components) {
-            component.second->draw();
-        }
-    }
 };
 
 class Service {
@@ -165,13 +160,191 @@ public:
     virtual void draw() {}
 };
 
+template <typename T>
+class MultiService : public Service {
+public:
+    std::unordered_map<std::string, std::unique_ptr<T>> services;
+
+    MultiService() = default;
+    void init() override {
+        for (auto& service : services) {
+            service.second->init();
+        }
+        Service::init();
+    }
+
+    void update() override {
+        for (auto& service : services) {
+            service.second->update();
+        }
+        Service::update();
+    }
+
+    void draw() override {
+        for (auto& service : services) {
+            service.second->draw();
+        }
+        Service::draw();
+    }
+
+    void add_service(std::string name, std::unique_ptr<T> service) {
+        static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
+        services[name] = std::move(service);
+    }
+
+    template <typename... TArgs>
+    T* add_service(std::string name, TArgs&&... args) {
+        static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
+        auto new_service = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* service_ptr = new_service.get();
+        add_service(name, std::move(new_service));
+        return service_ptr;
+    }
+
+    T* get_service(std::string name) {
+        return services[name].get();
+    }
+};
+
+class Manager {
+public:
+    bool is_init = false;
+
+    Manager() = default;
+    virtual ~Manager() = default;
+
+    virtual void init() {
+        is_init = true;
+    }
+};
+
+template <typename T>
+class MultiManager : public Manager {
+public:
+    std::unordered_map<std::string, std::unique_ptr<T>> managers;
+
+    MultiManager() = default;
+
+    void init() override {
+        for (auto& manager : managers) {
+            manager.second->init();
+        }
+        Manager::init();
+    }
+
+    void add_manager(std::string name, std::unique_ptr<T> manager) {
+        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
+        managers[name] = std::move(manager);
+    }
+
+    template <typename... TArgs>
+    T* add_manager(std::string name, TArgs&&... args) {
+        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
+        auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* manager_ptr = new_manager.get();
+        add_manager(name, std::move(new_manager));
+        return manager_ptr;
+    }
+
+    T* get_manager(std::string name) {
+        return managers[name].get();
+    }
+};
+
+class ManagerProvider {
+public:
+    std::unordered_map<std::type_index, std::unique_ptr<Manager>> managers;
+    bool is_init = false;
+
+    ManagerProvider() = default;
+    ~ManagerProvider() = default;
+
+    void init() {
+        for (auto& manager : managers) {
+            if (!manager.second->is_init) {
+                manager.second->init();
+            }
+        }
+        is_init = true;
+    }
+
+    template <typename T>
+    void add_manager(std::unique_ptr<T> manager) {
+        auto [it, inserted] = managers.emplace(std::type_index(typeid(T)), std::move(manager));
+        if (!inserted) {
+            TraceLog(LOG_ERROR, "Duplicate manager added: %s", typeid(T).name());
+        }
+    }
+
+    template <typename T, typename... TArgs>
+    T* add_manager(TArgs&&... args) {
+        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
+        auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* manager_ptr = new_manager.get();
+        add_manager<T>(std::move(new_manager));
+        return manager_ptr;
+    }
+
+    template <typename T>
+    T* get_manager() {
+        auto it = managers.find(std::type_index(typeid(T)));
+        if (it != managers.end()) {
+            auto manager = it->second.get();
+            if (!manager->is_init) {
+                TraceLog(LOG_ERROR, "Manager not initialized: %s", typeid(T).name());
+            }
+            return static_cast<T*>(manager);
+        }
+        TraceLog(LOG_FATAL, "Manager of requested type not found: %s", typeid(T).name());
+        return nullptr;
+    }
+};
+
 class Scene {
 public:
+    ManagerProvider* manager_provider = nullptr;
     std::vector<std::unique_ptr<GameObject>> game_objects;
     std::unordered_map<std::type_index, std::unique_ptr<Service>> services;
 
     Scene() = default;
     virtual ~Scene() = default;
+
+    virtual void init(ManagerProvider* manager_provider = nullptr) {
+        if (manager_provider && !manager_provider->is_init) {
+            TraceLog(LOG_FATAL, "ManagerProvider not initialized.");
+        }
+        this->manager_provider = manager_provider;
+        init_services();
+        for (auto& game_object : game_objects) {
+            game_object->init();
+        }
+    }
+
+    virtual void update(float delta_time) {
+        for (auto& game_object : game_objects) {
+            game_object->update(delta_time);
+        }
+        for (auto& service : services) {
+            service.second->update();
+        }
+    }
+
+    virtual void draw() {
+        for (auto& service : services) {
+            service.second->draw();
+        }
+        for (auto& game_object : game_objects) {
+            game_object->draw();
+        }
+    }
+
+    void init_services() {
+        for (auto& service : services) {
+            if (!service.second->is_init) {
+                service.second->init();
+            }
+        }
+    }
 
     void add_game_object(std::unique_ptr<GameObject> game_object) {
         game_object->scene = this;
@@ -189,6 +362,7 @@ public:
 
     template <typename T>
     void add_service(std::unique_ptr<T> service) {
+        static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
         service->scene = this;
         auto [it, inserted] = services.emplace(std::type_index(typeid(T)), std::move(service));
         if (!inserted) {
@@ -219,6 +393,14 @@ public:
         return nullptr;
     }
 
+    template <typename T>
+    T* get_manager() {
+        if (!manager_provider) {
+            TraceLog(LOG_FATAL, "No ManagerProvider assigned to scene.");
+        }
+        return manager_provider->get_manager<T>();
+    }
+
     std::vector<GameObject*> get_game_objects_with_tag(const std::string& tag) {
         std::vector<GameObject*> tagged_objects;
         for (auto& game_object : game_objects) {
@@ -227,38 +409,5 @@ public:
             }
         }
         return tagged_objects;
-    }
-
-    void init_services() {
-        for (auto& service : services) {
-            if (!service.second->is_init) {
-                service.second->init();
-            }
-        }
-    }
-
-    virtual void init() {
-        init_services();
-        for (auto& game_object : game_objects) {
-            game_object->init();
-        }
-    }
-
-    virtual void update(float delta_time) {
-        for (auto& game_object : game_objects) {
-            game_object->update(delta_time);
-        }
-        for (auto& service : services) {
-            service.second->update();
-        }
-    }
-
-    virtual void draw() {
-        for (auto& service : services) {
-            service.second->draw();
-        }
-        for (auto& game_object : game_objects) {
-            game_object->draw();
-        }
     }
 };

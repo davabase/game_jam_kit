@@ -28,7 +28,13 @@ int main(int argc, char** argv) {
     InitWindow(screen_width, screen_height, "Game Jam Kit");
     SetTargetFPS(60);
 
-    scene.init();
+    auto manager_provider = std::make_unique<ManagerProvider>();
+    auto font_manager = manager_provider->add_manager<FontManager>();
+    font_manager->load_font("Roboto", "assets/Roboto.ttf", 64);
+    font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
+    manager_provider->init();
+
+    scene.init(manager_provider.get());
 
     // Main game loop
     #ifdef __EMSCRIPTEN__
