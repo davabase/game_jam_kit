@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/prefabs.h"
-#include "engine/debug_draw.h"
+#include "engine/prefabs/includes.h"
+#include "engine/physics_debug.h"
 
 class Playground : public Scene {
 public:

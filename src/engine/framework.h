@@ -9,9 +9,6 @@
 
 #include <raylib.h>
 
-// TODO: Write docs with principles. Use get_service, get_game_objects_*, and get_component in init and store references. This way if a service, object, or component does not exist it will cause a crash during init.
-// TODO: Make WindowManager to store window size and init, etc. AudioManager for loading and playing sounds. SpriteManager for loading sprites.
-
 // Forward declarations.
 class GameObject;
 class Scene;

@@ -1,10 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <vector>
 
 #include <box2d/box2d.h>
-#include <algorithm>
-
 #include "math_extensions.h"
 
 /**
