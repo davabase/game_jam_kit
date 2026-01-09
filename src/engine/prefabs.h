@@ -6,6 +6,132 @@
 #include "math_extensions.h"
 #include "raycasts.h"
 
+/**
+ * For when you want a GameObject to have multiple of the same component.
+ */
+template <typename T>
+class MultiComponent : public Component {
+public:
+    std::unordered_map<std::string, std::unique_ptr<T>> components;
+
+    MultiComponent() {}
+
+    void init() override {
+        for (auto& component : components) {
+            component.second->init();
+        }
+    }
+
+    void update(float delta_time) override {
+        for (auto& component : components) {
+            component.second->update(delta_time);
+        }
+    }
+
+    void draw() override {
+        for (auto& component : components) {
+            component.second->draw();
+        }
+    }
+
+    void add_component(std::string name, std::unique_ptr<T> component) {
+        static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
+        components[name] = std::move(component);
+    }
+
+    template <typename... TArgs>
+    T* add_component(std::string name, TArgs&&... args) {
+        static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
+        auto new_component = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* component_ptr = new_component.get();
+        add_component(name, std::move(new_component));
+        return component_ptr;
+    }
+
+    T* get_component(std::string name) {
+        return components[name].get();
+    }
+};
+
+template <typename T>
+class MultiService : public Service {
+public:
+    std::unordered_map<std::string, std::unique_ptr<T>> services;
+
+    MultiService() = default;
+    void init_service() override {
+        for (auto& service : services) {
+            service.second->init();
+        }
+        Service::init_service();
+    }
+
+    void update() override {
+        for (auto& service : services) {
+            service.second->update();
+        }
+        Service::update();
+    }
+
+    void draw() override {
+        for (auto& service : services) {
+            service.second->draw();
+        }
+        Service::draw();
+    }
+
+    void add_service(std::string name, std::unique_ptr<T> service) {
+        static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
+        services[name] = std::move(service);
+    }
+
+    template <typename... TArgs>
+    T* add_service(std::string name, TArgs&&... args) {
+        static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
+        auto new_service = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* service_ptr = new_service.get();
+        add_service(name, std::move(new_service));
+        return service_ptr;
+    }
+
+    T* get_service(std::string name) {
+        return services[name].get();
+    }
+};
+
+template <typename T>
+class MultiManager : public Manager {
+public:
+    std::unordered_map<std::string, std::unique_ptr<T>> managers;
+
+    MultiManager() = default;
+
+    void init() override {
+        for (auto& manager : managers) {
+            manager.second->init_manager();
+        }
+        Manager::init();
+    }
+
+    void add_manager(std::string name, std::unique_ptr<T> manager) {
+        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
+        managers[name] = std::move(manager);
+    }
+
+    template <typename... TArgs>
+    T* add_manager(std::string name, TArgs&&... args) {
+        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
+        auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
+        T* manager_ptr = new_manager.get();
+        add_manager(name, std::move(new_manager));
+        return manager_ptr;
+    }
+
+    T* get_manager(std::string name) {
+        return managers[name].get();
+    }
+};
+
 class PhysicsService : public Service {
 public:
     b2WorldId world = b2_nullWorldId;
@@ -702,7 +828,7 @@ public:
     float rotation = 0.0f;
     float scale = 1.0f;
     Color tint = WHITE;
-    bool enabled = true;
+    bool is_active = true;
 
     SpriteComponent(std::string filename) : filename(filename) {}
     SpriteComponent(BodyComponent* body, std::string filename) : body(body), filename(filename) {}
@@ -716,7 +842,7 @@ public:
     }
 
     void draw() override {
-        if (!enabled) {
+        if (!is_active) {
             return;
         }
 
@@ -748,8 +874,8 @@ public:
         this->tint = tint;
     }
 
-    void set_enabled(bool enabled) {
-        this->enabled = enabled;
+    void set_active(bool active) {
+        is_active = active;
     }
 };
 
@@ -762,7 +888,7 @@ public:
 
     int current_frame = 0;
     bool playing = true;
-    bool enabled = true;
+    bool is_active = true;
 
     Animation(const std::vector<Texture2D>& frames, float fps = 15.0f, bool loop = true) : frames(frames), fps(fps), frame_timer(1.0f / fps), loop(loop) {}
 
@@ -782,7 +908,7 @@ public:
         if (frames.empty()) {
             return;
         }
-        if (!playing || !enabled) {
+        if (!playing || !is_active) {
             return;
         }
 
@@ -802,7 +928,7 @@ public:
     }
 
     void draw(Vector2 position, float rotation = 0.0f, Color tint = WHITE) {
-        if (!enabled) {
+        if (!is_active) {
             return;
         }
 
@@ -818,7 +944,7 @@ public:
     }
 
     void draw(Vector2 position, Vector2 origin, float rotation = 0.0f, float scale = 1.0f, bool flip_x = false, bool flip_y = false, Color tint = WHITE) {
-        if (!enabled) {
+        if (!is_active) {
             return;
         }
 

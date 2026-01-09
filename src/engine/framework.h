@@ -11,12 +11,43 @@
 
 // TODO: Write docs with principles. Use get_service, get_game_objects_*, and get_component in init and store references. This way if a service, object, or component does not exist it will cause a crash during init.
 // TODO: Make WindowManager to store window size and init, etc. AudioManager for loading and playing sounds. SpriteManager for loading sprites.
-// TODO: Move prebuilt Components, GameObjects, and Services to prefabs/ folder. Move ECS stuff and raycast helpers to utils/ folder.
 
 // Forward declarations.
 class GameObject;
 class Scene;
 class Game;
+
+template <typename T>
+class ObjectPool {
+public:
+    std::vector<std::shared_ptr<T>> objects;
+
+    ObjectPool() = default;
+    ObjectPool(size_t initial_size) {
+        objects.reserve(initial_size);
+        for (size_t i = 0; i < initial_size; ++i) {
+            objects.push_back(std::make_shared<T>());
+        }
+    }
+
+    std::shared_ptr<T> get_object() {
+        for (auto& obj : objects) {
+            if (!obj->is_active) {
+                obj->is_active = true;
+                return obj;
+            }
+        }
+        // No inactive objects, create a new one.
+        auto new_obj = std::make_shared<T>();
+        new_obj->is_active = true;
+        objects.push_back(new_obj);
+        return new_obj;
+    }
+
+    void return_object(std::shared_ptr<T> obj) {
+        obj->is_active = false;
+    }
+};
 
 class Component {
 public:
@@ -30,58 +61,12 @@ public:
     virtual void draw() {}
 };
 
-/**
- * For when you want a GameObject to have multiple of the same component.
- */
-template <typename T>
-class MultiComponent : public Component {
-public:
-    std::unordered_map<std::string, std::unique_ptr<T>> components;
-
-    MultiComponent() {}
-
-    void init() override {
-        for (auto& component : components) {
-            component.second->init();
-        }
-    }
-
-    void update(float delta_time) override {
-        for (auto& component : components) {
-            component.second->update(delta_time);
-        }
-    }
-
-    void draw() override {
-        for (auto& component : components) {
-            component.second->draw();
-        }
-    }
-
-    void add_component(std::string name, std::unique_ptr<T> component) {
-        static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
-        components[name] = std::move(component);
-    }
-
-    template <typename... TArgs>
-    T* add_component(std::string name, TArgs&&... args) {
-        static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
-        auto new_component = std::make_unique<T>(std::forward<TArgs>(args)...);
-        T* component_ptr = new_component.get();
-        add_component(name, std::move(new_component));
-        return component_ptr;
-    }
-
-    T* get_component(std::string name) {
-        return components[name].get();
-    }
-};
-
 class GameObject {
 public:
     Scene* scene = nullptr;
     std::unordered_map<std::type_index, std::unique_ptr<Component>> components;
     std::unordered_set<std::string> tags;
+    bool is_active = true;
 
     GameObject() = default;
     virtual ~GameObject() = default;
@@ -98,6 +83,9 @@ public:
     }
 
     virtual void update_object(float delta_time) {
+        if (!is_active) {
+            return;
+        }
         update(delta_time);
         for (auto& component : components) {
             component.second->update(delta_time);
@@ -105,6 +93,9 @@ public:
     }
 
     virtual void draw_object() {
+        if (!is_active) {
+            return;
+        }
         draw();
         for (auto& component : components) {
             component.second->draw();
@@ -174,52 +165,6 @@ public:
     }
 };
 
-template <typename T>
-class MultiService : public Service {
-public:
-    std::unordered_map<std::string, std::unique_ptr<T>> services;
-
-    MultiService() = default;
-    void init_service() override {
-        for (auto& service : services) {
-            service.second->init();
-        }
-        Service::init_service();
-    }
-
-    void update() override {
-        for (auto& service : services) {
-            service.second->update();
-        }
-        Service::update();
-    }
-
-    void draw() override {
-        for (auto& service : services) {
-            service.second->draw();
-        }
-        Service::draw();
-    }
-
-    void add_service(std::string name, std::unique_ptr<T> service) {
-        static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
-        services[name] = std::move(service);
-    }
-
-    template <typename... TArgs>
-    T* add_service(std::string name, TArgs&&... args) {
-        static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
-        auto new_service = std::make_unique<T>(std::forward<TArgs>(args)...);
-        T* service_ptr = new_service.get();
-        add_service(name, std::move(new_service));
-        return service_ptr;
-    }
-
-    T* get_service(std::string name) {
-        return services[name].get();
-    }
-};
-
 class Manager {
 public:
     bool is_init = false;
@@ -237,42 +182,9 @@ public:
     }
 };
 
-template <typename T>
-class MultiManager : public Manager {
-public:
-    std::unordered_map<std::string, std::unique_ptr<T>> managers;
-
-    MultiManager() = default;
-
-    void init() override {
-        for (auto& manager : managers) {
-            manager.second->init_manager();
-        }
-        Manager::init();
-    }
-
-    void add_manager(std::string name, std::unique_ptr<T> manager) {
-        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
-        managers[name] = std::move(manager);
-    }
-
-    template <typename... TArgs>
-    T* add_manager(std::string name, TArgs&&... args) {
-        static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
-        auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
-        T* manager_ptr = new_manager.get();
-        add_manager(name, std::move(new_manager));
-        return manager_ptr;
-    }
-
-    T* get_manager(std::string name) {
-        return managers[name].get();
-    }
-};
-
 class Scene {
 public:
-    std::vector<std::unique_ptr<GameObject>> game_objects;
+    std::vector<std::shared_ptr<GameObject>> game_objects;
     std::unordered_map<std::type_index, std::unique_ptr<Service>> services;
     Game* game = nullptr;
     bool is_init = false;
@@ -307,11 +219,11 @@ public:
     virtual void update_scene(float delta_time) {
         update(delta_time);
 
-        for (auto& game_object : game_objects) {
-            game_object->update_object(delta_time);
-        }
         for (auto& service : services) {
             service.second->update();
+        }
+        for (auto& game_object : game_objects) {
+            game_object->update_object(delta_time);
         }
     }
 
@@ -326,19 +238,20 @@ public:
         }
     }
 
-    virtual void on_transition() {}
+    virtual void on_enter() {}
+    virtual void on_exit() {}
 
-    void add_game_object(std::unique_ptr<GameObject> game_object) {
+    void add_game_object(std::shared_ptr<GameObject> game_object) {
         game_object->scene = this;
-        game_objects.push_back(std::move(game_object));
+        game_objects.push_back(game_object);
     }
 
     template <typename T, typename... TArgs>
     T* add_game_object(TArgs&&... args) {
         static_assert(std::is_base_of<GameObject, T>::value, "T must derive from GameObject");
-        auto new_object = std::make_unique<T>(std::forward<TArgs>(args)...);
+        auto new_object = std::make_shared<T>(std::forward<TArgs>(args)...);
         T* object_ptr = new_object.get();
-        add_game_object(std::move(new_object));
+        add_game_object(new_object);
         return object_ptr;
     }
 
@@ -397,7 +310,8 @@ public:
 class Game {
 public:
     std::unordered_map<std::type_index, std::unique_ptr<Manager>> managers;
-    std::map<std::string, std::unique_ptr<Scene>> scenes;
+    std::unordered_map<std::string, std::unique_ptr<Scene>> scenes;
+    std::vector<std::string> scene_order;
     Scene* current_scene = nullptr;
     Scene* next_scene = nullptr;
 
@@ -411,10 +325,9 @@ public:
     }
 
     void update(float delta_time) {
-        // TODO: When do we init scenes?
-        current_scene->init_scene();
-
         if (current_scene) {
+            // Scene is only initialized if it wasn't already.
+            current_scene->init_scene();
             current_scene->update_scene(delta_time);
 
             BeginDrawing();
@@ -427,8 +340,11 @@ public:
 
         // Switch scenes if needed.
         if (next_scene) {
+            if (current_scene) {
+                current_scene->on_exit();
+            }
             current_scene = next_scene;
-            current_scene->on_transition();
+            current_scene->on_enter();
             next_scene = nullptr;
         }
     }
@@ -468,6 +384,7 @@ public:
     void add_scene(std::string name, std::unique_ptr<Scene> scene) {
         scenes[name] = std::move(scene);
         scenes[name]->game = this;
+        scene_order.push_back(name);
         if (!current_scene) {
             current_scene = scenes[name].get();
         }
@@ -496,28 +413,32 @@ public:
     }
 
     Scene* go_to_scene_next() {
-        // Find the next scene in the map.
+        // Find the next scene.
         if (current_scene) {
-            auto it = scenes.begin();;
+            auto it = scenes.begin();
             while (it != scenes.end()) {
                 if (it->second.get() == current_scene) {
-                    ++it;
                     break;
                 }
                 ++it;
             }
             if (it != scenes.end()) {
-                next_scene = it->second.get();
-            } else {
-                // Loop back to the first scene.
-                next_scene = scenes.begin()->second.get();
+                std::string name = it->first;
+                auto order_it = std::find(scene_order.begin(), scene_order.end(), name);
+                if (order_it != scene_order.end() && std::next(order_it) != scene_order.end()) {
+                    std::string next_name = *(std::next(order_it));
+                    next_scene = scenes[next_name].get();
+                } else {
+                    // Loop back to the first scene.
+                    next_scene = scenes[scene_order[0]].get();
+                }
             }
         }
         return next_scene;
     }
 
     Scene* go_to_scene_previous() {
-        // Find the previous scene in the map.
+        // Find the previous scene.
         if (current_scene) {
             auto it = scenes.end();
             while (it != scenes.begin()) {
@@ -527,10 +448,15 @@ public:
                 }
             }
             if (it != scenes.begin()) {
-                next_scene = it->second.get();
-            } else {
-                // Loop back to the last scene.
-                next_scene = std::prev(scenes.end())->second.get();
+                std::string name = it->first;
+                auto order_it = std::find(scene_order.begin(), scene_order.end(), name);
+                if (order_it != scene_order.end() && order_it != scene_order.begin()) {
+                    std::string prev_name = *(std::prev(order_it));
+                    next_scene = scenes[prev_name].get();
+                } else {
+                    // Loop back to the last scene.
+                    next_scene = scenes[scene_order.back()].get();
+                }
             }
         }
         return next_scene;
