@@ -6,12 +6,14 @@
 
 Game game;
 
-void update() {
+void update()
+{
     float delta_time = GetFrameTime();
     game.update(delta_time);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     // Initialize the window
     const int screen_width = 800;
     const int screen_height = 600;
@@ -27,13 +29,14 @@ int main(int argc, char** argv) {
     game.add_scene<Playground>("playground");
     game.add_scene<Playground>("playground2");
 
-    // Main game loop
-    #ifdef __EMSCRIPTEN__
+// Main game loop
+#ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(update, 0, true);
-    #else
-    while (!WindowShouldClose()) {
+#else
+    while (!WindowShouldClose())
+    {
         update();
     }
-    #endif
+#endif
     return 0;
 }

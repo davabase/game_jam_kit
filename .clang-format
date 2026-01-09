@@ -1,0 +1,14 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+AccessModifierOffset: -4
+BreakBeforeBraces: Allman
+ColumnLimit: 120
+PointerAlignment: Left
+ReferenceAlignment: Left
+BinPackParameters: false
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
+AllowShortFunctionsOnASingleLine: Empty
+BreakConstructorInitializers: AfterColon
+PackConstructorInitializers: CurrentLine
+AlignTrailingComments: false

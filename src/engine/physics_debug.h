@@ -11,18 +11,18 @@ struct DebugDrawCtx
 
 static Color ToRaylibColor(b2HexColor c, unsigned char a = 255)
 {
-    unsigned int v = (unsigned int)c; // 0xRRGGBB
+    unsigned int v = (unsigned int)c;
     unsigned char r = (v >> 16) & 0xFF;
-    unsigned char g = (v >>  8) & 0xFF;
-    unsigned char b = (v >>  0) & 0xFF;
-    return Color{ r, g, b, a };
+    unsigned char g = (v >> 8) & 0xFF;
+    unsigned char b = (v >> 0) & 0xFF;
+    return Color{r, g, b, a};
 }
 
 static void DrawSegment(const b2Vec2 p1, const b2Vec2 p2, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
-    Vector2 a{ p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels };
-    Vector2 b{ p2.x * ctx->meters_to_pixels, p2.y * ctx->meters_to_pixels };
+    Vector2 a{p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels};
+    Vector2 b{p2.x * ctx->meters_to_pixels, p2.y * ctx->meters_to_pixels};
     DrawLineEx(a, b, ctx->line_thickness, ToRaylibColor(color));
 }
 
@@ -35,12 +35,10 @@ static void DrawPolygon(const b2Vec2* v, int count, b2HexColor color, void* cont
     {
         b2Vec2 p0 = v[i];
         b2Vec2 p1 = v[(i + 1) % count];
-        DrawLineEx(
-            { p0.x * ctx->meters_to_pixels, p0.y * ctx->meters_to_pixels },
-            { p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels },
-            ctx->line_thickness,
-            c
-        );
+        DrawLineEx({p0.x * ctx->meters_to_pixels, p0.y * ctx->meters_to_pixels},
+                   {p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels},
+                   ctx->line_thickness,
+                   c);
     }
 }
 
@@ -61,7 +59,7 @@ static void DrawSolidPolygon(b2Transform xf, const b2Vec2* v, int count, float r
     for (int i = 0; i < count; ++i)
     {
         b2Vec2 wp = b2TransformPoint(xf, v[i]);
-        Vector2 p{ wp.x * ctx->meters_to_pixels, wp.y * ctx->meters_to_pixels };
+        Vector2 p{wp.x * ctx->meters_to_pixels, wp.y * ctx->meters_to_pixels};
         pts.push_back(p);
         center.x += p.x;
         center.y += p.y;
@@ -87,12 +85,10 @@ static void DrawSolidPolygon(b2Transform xf, const b2Vec2* v, int count, float r
 static void DrawCircleOutline(b2Vec2 center, float radius, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
-    DrawCircleLines(
-        (int)(center.x * ctx->meters_to_pixels),
-        (int)(center.y * ctx->meters_to_pixels),
-        radius * ctx->meters_to_pixels,
-        ToRaylibColor(color)
-    );
+    DrawCircleLines((int)(center.x * ctx->meters_to_pixels),
+                    (int)(center.y * ctx->meters_to_pixels),
+                    radius * ctx->meters_to_pixels,
+                    ToRaylibColor(color));
 }
 
 static void DrawSolidCircle(b2Transform xf, float radius, b2HexColor color, void* context)
@@ -102,37 +98,40 @@ static void DrawSolidCircle(b2Transform xf, float radius, b2HexColor color, void
 
     auto* ctx = (DebugDrawCtx*)context;
     b2Vec2 center = xf.p;
-    DrawCircle(
-        (int)(center.x * ctx->meters_to_pixels),
-        (int)(center.y * ctx->meters_to_pixels),
-        radius * ctx->meters_to_pixels,
-        fill
-    );
+    DrawCircle((int)(center.x * ctx->meters_to_pixels),
+               (int)(center.y * ctx->meters_to_pixels),
+               radius * ctx->meters_to_pixels,
+               fill);
 
-    b2Vec2 line_end = b2TransformPoint(xf, { radius, 0 });
-    DrawLineEx(
-        { center.x * ctx->meters_to_pixels, center.y * ctx->meters_to_pixels },
-        { line_end.x * ctx->meters_to_pixels, line_end.y * ctx->meters_to_pixels },
-        ctx->line_thickness,
-        line
-    );
+    b2Vec2 line_end = b2TransformPoint(xf, {radius, 0});
+    DrawLineEx({center.x * ctx->meters_to_pixels, center.y * ctx->meters_to_pixels},
+               {line_end.x * ctx->meters_to_pixels, line_end.y * ctx->meters_to_pixels},
+               ctx->line_thickness,
+               line);
 }
 
 static Vector2 ToPx(b2Vec2 p_m, float m2p)
 {
-    return Vector2{ p_m.x * m2p, p_m.y * m2p };
+    return Vector2{p_m.x * m2p, p_m.y * m2p};
 }
 
-static float Len(Vector2 v) { return std::sqrt(v.x*v.x + v.y*v.y); }
+static float Len(Vector2 v)
+{
+    return std::sqrt(v.x * v.x + v.y * v.y);
+}
 
 static Vector2 Normalize(Vector2 v)
 {
     float l = Len(v);
-    if (l <= 1e-6f) return Vector2{0, 0};
-    return Vector2{ v.x / l, v.y / l };
+    if (l <= 1e-6f)
+        return Vector2{0, 0};
+    return Vector2{v.x / l, v.y / l};
 }
 
-static Vector2 Perp(Vector2 v) { return Vector2{ -v.y, v.x }; }
+static Vector2 Perp(Vector2 v)
+{
+    return Vector2{-v.y, v.x};
+}
 
 static void DrawSolidCapsule(b2Vec2 p1, b2Vec2 p2, float radius_m, b2HexColor color, void* context)
 {
@@ -141,22 +140,22 @@ static void DrawSolidCapsule(b2Vec2 p1, b2Vec2 p2, float radius_m, b2HexColor co
     Color fill = ToRaylibColor(color, 255 * 0.8);
     Color line = ToRaylibColor(color, 255);
 
-    Vector2 a = { p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels};
-    Vector2 b = { p2.x * ctx->meters_to_pixels, p2.y * ctx->meters_to_pixels};
+    Vector2 a = {p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels};
+    Vector2 b = {p2.x * ctx->meters_to_pixels, p2.y * ctx->meters_to_pixels};
 
     float r = radius_m * ctx->meters_to_pixels;
 
-    Vector2 ab = Vector2{ b.x - a.x, b.y - a.y };
+    Vector2 ab = Vector2{b.x - a.x, b.y - a.y};
 
     Vector2 dir = Normalize(ab);
-    Vector2 n   = Perp(dir);
-    Vector2 off = Vector2{ n.x * r, n.y * r };
+    Vector2 n = Perp(dir);
+    Vector2 off = Vector2{n.x * r, n.y * r};
 
     // Rectangle corners that connect the tangent points of end circles
-    Vector2 aL = Vector2{ a.x + off.x, a.y + off.y };
-    Vector2 aR = Vector2{ a.x - off.x, a.y - off.y };
-    Vector2 bL = Vector2{ b.x + off.x, b.y + off.y };
-    Vector2 bR = Vector2{ b.x - off.x, b.y - off.y };
+    Vector2 aL = Vector2{a.x + off.x, a.y + off.y};
+    Vector2 aR = Vector2{a.x - off.x, a.y - off.y};
+    Vector2 bL = Vector2{b.x + off.x, b.y + off.y};
+    Vector2 bR = Vector2{b.x - off.x, b.y - off.y};
 
     // ---- Fill ----
     // Middle quad as two triangles
@@ -183,7 +182,7 @@ static void DrawSolidCapsule(b2Vec2 p1, b2Vec2 p2, float radius_m, b2HexColor co
 static void DrawPoint(b2Vec2 p, float size, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
-    DrawCircleV({ p.x * ctx->meters_to_pixels, p.y * ctx->meters_to_pixels }, size, ToRaylibColor(color));
+    DrawCircleV({p.x * ctx->meters_to_pixels, p.y * ctx->meters_to_pixels}, size, ToRaylibColor(color));
 }
 
 static void DrawTransform(b2Transform xf, void* context)
@@ -192,22 +191,18 @@ static void DrawTransform(b2Transform xf, void* context)
 
     // Draw axes: x axis in red, y axis in green
     b2Vec2 p = xf.p;
-    b2Vec2 xAxis = b2RotateVector(xf.q, b2Vec2{1,0});
-    b2Vec2 yAxis = b2RotateVector(xf.q, b2Vec2{0,1});
+    b2Vec2 xAxis = b2RotateVector(xf.q, b2Vec2{1, 0});
+    b2Vec2 yAxis = b2RotateVector(xf.q, b2Vec2{0, 1});
 
     float L = 0.5f; // meters
-    DrawLineEx(
-        { p.x * ctx->meters_to_pixels, p.y * ctx->meters_to_pixels },
-        { (p.x + L * xAxis.x) * ctx->meters_to_pixels, (p.y + L * xAxis.y) * ctx->meters_to_pixels },
-        ctx->line_thickness,
-        RED
-    );
-    DrawLineEx(
-        { p.x * ctx->meters_to_pixels, p.y * ctx->meters_to_pixels },
-        { (p.x + L * yAxis.x) * ctx->meters_to_pixels, (p.y + L * yAxis.y) * ctx->meters_to_pixels },
-        ctx->line_thickness,
-        GREEN
-    );
+    DrawLineEx({p.x * ctx->meters_to_pixels, p.y * ctx->meters_to_pixels},
+               {(p.x + L * xAxis.x) * ctx->meters_to_pixels, (p.y + L * xAxis.y) * ctx->meters_to_pixels},
+               ctx->line_thickness,
+               RED);
+    DrawLineEx({p.x * ctx->meters_to_pixels, p.y * ctx->meters_to_pixels},
+               {(p.x + L * yAxis.x) * ctx->meters_to_pixels, (p.y + L * yAxis.y) * ctx->meters_to_pixels},
+               ctx->line_thickness,
+               GREEN);
 }
 
 static void DrawString(b2Vec2 p, const char* s, b2HexColor color, void* context)
@@ -216,8 +211,9 @@ static void DrawString(b2Vec2 p, const char* s, b2HexColor color, void* context)
     DrawText(s, (int)(p.x * ctx->meters_to_pixels), (int)(p.y * ctx->meters_to_pixels), 10, ToRaylibColor(color));
 }
 
-struct PhysicsDebugRenderer
+class PhysicsDebugRenderer
 {
+public:
     DebugDrawCtx ctx;
     b2DebugDraw dd{};
 

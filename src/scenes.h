@@ -1,11 +1,13 @@
 #pragma once
 
-#include "engine/prefabs/includes.h"
 #include "engine/physics_debug.h"
+#include "engine/prefabs/includes.h"
 
-class Playground : public Scene {
+class Playground : public Scene
+{
 public:
-    void init_services() override {
+    void init_services() override
+    {
         add_service<TextureService>();
         add_service<SoundService>();
         add_service<PhysicsService>();
@@ -13,14 +15,17 @@ public:
         add_service<LevelService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
     }
 
-    void init() override {
+    void init() override
+    {
         auto level = get_service<LevelService>();
         auto player_entity = level->get_entity_by_name("Player");
-        if (!player_entity) {
+        if (!player_entity)
+        {
             assert(false);
         }
         auto box_entity = level->get_entity_by_tag("box");
-        if (!box_entity) {
+        if (!box_entity)
+        {
             assert(false);
         }
 
@@ -32,7 +37,6 @@ public:
         auto position = level->convert_to_pixels(box_entity->getPosition());
         auto size = level->convert_to_pixels(box_entity->getSize());
         auto box = add_game_object<DynamicBox>(position, size, 46.0f);
-
 
         auto ground = add_game_object<StaticBox>(400.0f, 587.5f, 800.0f, 25.0f);
         ground->add_tag("ground");
@@ -47,7 +51,8 @@ public:
         split_camera2->add_tag("camera");
     }
 
-    void update(float delta_time) override {
+    void update(float delta_time) override
+    {
         auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
@@ -59,12 +64,14 @@ public:
         Rectangle rec = {local.x - 10, local.y - 10, 20, 20};
         auto contacts = physics->rectangle_overlap(rec, 0);
 
-        if (IsKeyPressed(KEY_SPACE)) {
+        if (IsKeyPressed(KEY_SPACE))
+        {
             game->go_to_scene_next();
         }
     }
 
-    void draw_scene() override {
+    void draw_scene() override
+    {
         auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto physics = get_service<PhysicsService>();
