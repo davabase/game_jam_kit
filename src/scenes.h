@@ -53,9 +53,9 @@ public:
 
     void update(float delta_time) override
     {
-        auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
-        auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
-        auto player = dynamic_cast<Character*>(get_game_objects_with_tag("character")[0]);
+        auto camera = static_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
+        auto camera2 = static_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
+        auto player = static_cast<Character*>(get_game_objects_with_tag("character")[0]);
         auto physics = get_service<PhysicsService>();
         camera->target = player->body->get_position_pixels();
         camera2->target = player->body->get_position_pixels();
@@ -72,8 +72,8 @@ public:
 
     void draw_scene() override
     {
-        auto camera = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
-        auto camera2 = dynamic_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
+        auto camera = static_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
+        auto camera2 = static_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
         auto physics = get_service<PhysicsService>();
 
         // The scene needs to be rendered for each camera.
