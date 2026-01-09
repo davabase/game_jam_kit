@@ -143,21 +143,38 @@ public:
         }
     }
 
-    Texture2D& load_texture(const std::string& filename) {
-        if (textures.find(filename) != textures.end()) {
-            return textures[filename];
-        }
-
-        Texture2D texture = LoadTexture(filename.c_str());
-        textures[filename] = texture;
-        return textures[filename];
-    }
-
     Texture2D& get_texture(const std::string& filename) {
         if (textures.find(filename) == textures.end()) {
-            load_texture(filename);
+            Texture2D texture = LoadTexture(filename.c_str());
+            textures[filename] = texture;
         }
         return textures[filename];
+    }
+};
+
+class SoundService : public Service {
+public:
+    std::unordered_map<std::string, std::vector<Sound>> sounds;
+
+    SoundService() = default;
+    ~SoundService() {
+        for (auto& pair : sounds) {
+            for (auto& sound : pair.second) {
+                UnloadSound(sound);
+            }
+        }
+    }
+
+    Sound& get_sound(const std::string& filename) {
+        if (sounds.find(filename) == sounds.end()) {
+            Sound sound = LoadSound(filename.c_str());
+            sounds[filename] = { sound };
+        } else {
+            // Create a new alias to allow overlapping sounds.
+            Sound sound = LoadSoundAlias(sounds[filename][0]);
+            sounds[filename].push_back(sound);
+        }
+        return sounds[filename].back();
     }
 };
 
@@ -1435,6 +1452,44 @@ public:
     }
 };
 
+class SoundComponent : public Component {
+public:
+    std::string filename;
+    Sound sound;
+    float volume = 1.0f;
+    float pitch = 1.0f;
+
+    SoundComponent(std::string filename, float volume = 1.0f, float pitch = 1.0f)
+        : filename(filename), volume(volume), pitch(pitch) {}
+
+    void init() override {
+        auto sound_service = owner->scene->get_service<SoundService>();
+        sound = sound_service->get_sound(filename);
+    }
+
+    void play() {
+        PlaySound(sound);
+    }
+
+    void stop() {
+        StopSound(sound);
+    }
+
+    void set_volume(float volume) {
+        this->volume = volume;
+        SetSoundVolume(sound, volume);
+    }
+
+    void set_pitch(float pitch) {
+        this->pitch = pitch;
+        SetSoundPitch(sound, pitch);
+    }
+
+    bool is_playing() {
+        return IsSoundPlaying(sound);
+    }
+};
+
 struct MovementParams {
     float width = 24.0f; // pixels
     float height = 40.0f; // pixels
@@ -1597,6 +1652,7 @@ public:
     MovementComponent* movement;
     AnimationController* animation;
     TextComponent* text_component;
+    SoundComponent* jump_sound;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -1644,6 +1700,8 @@ public:
 
         text_component = add_component<TextComponent>("Character", "Roboto", 128, WHITE);
         text_component->position = {p.position.x, p.position.y - p.height / 2.0f - 20.0f};
+
+        jump_sound = add_component<SoundComponent>("assets/explosionCrunch_000.ogg");
     }
 
     void update(float delta_time) override {
@@ -1675,6 +1733,10 @@ public:
         }
         else {
             animation->play("idle");
+        }
+
+        if (jump_pressed) {
+            jump_sound->play();
         }
 
         movement->set_input(move_x, jump_pressed, jump_held);

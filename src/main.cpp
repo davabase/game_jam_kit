@@ -16,6 +16,7 @@ int main(int argc, char** argv) {
     const int screen_width = 800;
     const int screen_height = 600;
     InitWindow(screen_width, screen_height, "Game Jam Kit");
+    InitAudioDevice();
     SetTargetFPS(60);
 
     auto font_manager = game.add_manager<FontManager>();
