@@ -10,5 +10,8 @@ BinPackArguments: false
 AllowAllArgumentsOnNextLine: false
 AllowShortFunctionsOnASingleLine: Empty
 BreakConstructorInitializers: AfterColon
+AlwaysBreakAfterDefinitionReturnType: None
+PenaltyReturnTypeOnItsOwnLine : 100
 PackConstructorInitializers: CurrentLine
+AlwaysBreakTemplateDeclarations: Yes
 AlignTrailingComments: false

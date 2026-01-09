@@ -1,23 +1,46 @@
 #pragma once
 
+#include <cmath>
+#include <vector>
+
 #include <box2d/box2d.h>
 #include <raylib.h>
 
+/**
+ * The debug draw context for rendering Box2D debug information.
+ */
 struct DebugDrawCtx
 {
     float meters_to_pixels = 30.0f;
     float line_thickness = 1.0f;
 };
 
-static Color ToRaylibColor(b2HexColor c, unsigned char a = 255)
+/**
+ * Convert a b2HexColor to a Raylib Color.
+ *
+ * @param c The b2HexColor to convert.
+ * @param a The alpha value.
+ * @return The converted Color.
+ */
+static Color ToRaylibColor(b2HexColor c, float a = 1.0f)
 {
     unsigned int v = (unsigned int)c;
     unsigned char r = (v >> 16) & 0xFF;
     unsigned char g = (v >> 8) & 0xFF;
     unsigned char b = (v >> 0) & 0xFF;
-    return Color{r, g, b, a};
+    a = std::fmax(0.0f, std::fmin(1.0f, a)) * 255.0f;
+    unsigned char alpha = static_cast<unsigned char>(a);
+    return Color{r, g, b, alpha};
 }
 
+/**
+ * Draw a line segment.
+ *
+ * @param p1 The start point.
+ * @param p2 The end point.
+ * @param color The color of the line.
+ * @param context The debug draw context.
+ */
 static void DrawSegment(const b2Vec2 p1, const b2Vec2 p2, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
@@ -26,6 +49,14 @@ static void DrawSegment(const b2Vec2 p1, const b2Vec2 p2, b2HexColor color, void
     DrawLineEx(a, b, ctx->line_thickness, ToRaylibColor(color));
 }
 
+/**
+ * Draw a polygon outline.
+ *
+ * @param v The vertices of the polygon.
+ * @param count The number of vertices.
+ * @param color The color of the polygon.
+ * @param context The debug draw context.
+ */
 static void DrawPolygon(const b2Vec2* v, int count, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
@@ -42,14 +73,24 @@ static void DrawPolygon(const b2Vec2* v, int count, b2HexColor color, void* cont
     }
 }
 
+/**
+ * Draw a filled polygon.
+ *
+ * @param xf The transform of the polygon.
+ * @param v The vertices of the polygon.
+ * @param count The number of vertices.
+ * @param radius The radius for edge rounding (not used).
+ * @param color The color of the polygon.
+ * @param context The debug draw context.
+ */
 static void DrawSolidPolygon(b2Transform xf, const b2Vec2* v, int count, float radius, b2HexColor color, void* context)
 {
     (void)radius;
     auto* ctx = (DebugDrawCtx*)context;
 
     // Fill color with some alpha so you can see overlap.
-    Color fill = ToRaylibColor(color, 255 * 0.8);
-    Color line = ToRaylibColor(color, 255);
+    Color fill = ToRaylibColor(color, 0.8);
+    Color line = ToRaylibColor(color);
 
     // Transform to pixels.
     std::vector<Vector2> pts;
@@ -82,6 +123,14 @@ static void DrawSolidPolygon(b2Transform xf, const b2Vec2* v, int count, float r
     }
 }
 
+/**
+ * Draw a circle outline.
+ *
+ * @param center The center of the circle.
+ * @param radius The radius of the circle.
+ * @param color The color of the circle.
+ * @param context The debug draw context.
+ */
 static void DrawCircleOutline(b2Vec2 center, float radius, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
@@ -91,10 +140,18 @@ static void DrawCircleOutline(b2Vec2 center, float radius, b2HexColor color, voi
                     ToRaylibColor(color));
 }
 
+/**
+ * Draw a filled circle.
+ *
+ * @param xf The transform of the circle.
+ * @param radius The radius of the circle.
+ * @param color The color of the circle.
+ * @param context The debug draw context.
+ */
 static void DrawSolidCircle(b2Transform xf, float radius, b2HexColor color, void* context)
 {
-    Color fill = ToRaylibColor(color, 255 * 0.8);
-    Color line = ToRaylibColor(color, 255);
+    Color fill = ToRaylibColor(color, 0.8);
+    Color line = ToRaylibColor(color);
 
     auto* ctx = (DebugDrawCtx*)context;
     b2Vec2 center = xf.p;
@@ -110,16 +167,23 @@ static void DrawSolidCircle(b2Transform xf, float radius, b2HexColor color, void
                line);
 }
 
-static Vector2 ToPx(b2Vec2 p_m, float m2p)
-{
-    return Vector2{p_m.x * m2p, p_m.y * m2p};
-}
-
+/**
+ * Compute the length of a vector.
+ *
+ * @param v The vector.
+ * @return The length of the vector.
+ */
 static float Len(Vector2 v)
 {
     return std::sqrt(v.x * v.x + v.y * v.y);
 }
 
+/**
+ * Normalize a vector.
+ *
+ * @param v The vector.
+ * @return The normalized vector.
+ */
 static Vector2 Normalize(Vector2 v)
 {
     float l = Len(v);
@@ -128,17 +192,32 @@ static Vector2 Normalize(Vector2 v)
     return Vector2{v.x / l, v.y / l};
 }
 
+/**
+ * Compute the perpendicular vector.
+ *
+ * @param v The vector.
+ * @return The perpendicular vector.
+ */
 static Vector2 Perp(Vector2 v)
 {
     return Vector2{-v.y, v.x};
 }
 
+/**
+ * Draw a filled capsule.
+ *
+ * @param p1 The first endpoint.
+ * @param p2 The second endpoint.
+ * @param radius_m The radius of the capsule.
+ * @param color The color of the capsule.
+ * @param context The debug draw context.
+ */
 static void DrawSolidCapsule(b2Vec2 p1, b2Vec2 p2, float radius_m, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
 
-    Color fill = ToRaylibColor(color, 255 * 0.8);
-    Color line = ToRaylibColor(color, 255);
+    Color fill = ToRaylibColor(color, 0.8);
+    Color line = ToRaylibColor(color);
 
     Vector2 a = {p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels};
     Vector2 b = {p2.x * ctx->meters_to_pixels, p2.y * ctx->meters_to_pixels};
@@ -179,12 +258,26 @@ static void DrawSolidCapsule(b2Vec2 p1, b2Vec2 p2, float radius_m, b2HexColor co
     DrawLineEx(a, b, ctx->line_thickness, line);
 }
 
+/**
+ * Draw a point.
+ *
+ * @param p The position of the point.
+ * @param size The size of the point.
+ * @param color The color of the point.
+ * @param context The debug draw context.
+ */
 static void DrawPoint(b2Vec2 p, float size, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
     DrawCircleV({p.x * ctx->meters_to_pixels, p.y * ctx->meters_to_pixels}, size, ToRaylibColor(color));
 }
 
+/**
+ * Draw a transform.
+ *
+ * @param xf The transform to draw.
+ * @param context The debug draw context.
+ */
 static void DrawTransform(b2Transform xf, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
@@ -205,18 +298,35 @@ static void DrawTransform(b2Transform xf, void* context)
                GREEN);
 }
 
+/**
+ * Draw a string.
+ *
+ * @param p The position to draw the string.
+ * @param s The string to draw.
+ * @param color The color of the string.
+ * @param context The debug draw context.
+ */
 static void DrawString(b2Vec2 p, const char* s, b2HexColor color, void* context)
 {
     auto* ctx = (DebugDrawCtx*)context;
     DrawText(s, (int)(p.x * ctx->meters_to_pixels), (int)(p.y * ctx->meters_to_pixels), 10, ToRaylibColor(color));
 }
 
+/**
+ * The physics debug renderer.
+ */
 class PhysicsDebugRenderer
 {
 public:
     DebugDrawCtx ctx;
     b2DebugDraw dd{};
 
+    /**
+     * Initialize the debug renderer.
+     *
+     * @param meters_to_pixels The scale factor from meters to pixels.
+     * @param line_thickness The thickness of lines.
+     */
     void init(float meters_to_pixels = 30.0f, float line_thickness = 1.0f)
     {
         ctx.meters_to_pixels = meters_to_pixels;
@@ -251,6 +361,11 @@ public:
         dd.context = &ctx;
     }
 
+    /**
+     * Draw the debug information for the given world.
+     *
+     * @param world The Box2D world.
+     */
     void debug_draw(b2WorldId world)
     {
         b2World_Draw(world, &dd);

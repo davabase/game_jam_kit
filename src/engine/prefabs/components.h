@@ -8,13 +8,17 @@
 /**
  * For when you want a GameObject to have multiple of the same component.
  */
-template <typename T> class MultiComponent : public Component
+template <typename T>
+class MultiComponent : public Component
 {
 public:
     std::unordered_map<std::string, std::unique_ptr<T>> components;
 
     MultiComponent() {}
 
+    /**
+     * Initialize all components.
+     */
     void init() override
     {
         for (auto& component : components)
@@ -23,6 +27,11 @@ public:
         }
     }
 
+    /**
+     * Update all components.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     void update(float delta_time) override
     {
         for (auto& component : components)
@@ -31,6 +40,9 @@ public:
         }
     }
 
+    /**
+     * Draw all components.
+     */
     void draw() override
     {
         for (auto& component : components)
@@ -39,13 +51,27 @@ public:
         }
     }
 
+    /**
+     * Add a component to the MultiComponent.
+     *
+     * @param name The name to give the component.
+     * @param component The component to add.
+     */
     void add_component(std::string name, std::unique_ptr<T> component)
     {
         static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         components[name] = std::move(component);
     }
 
-    template <typename... TArgs> T* add_component(std::string name, TArgs&&... args)
+    /**
+     * Create a component and add it to the MultiComponent.
+     *
+     * @param name The name to give the component.
+     * @param args The arguments to forward to the component constructor.
+     * @return A pointer to the added component.
+     */
+    template <typename... TArgs>
+    T* add_component(std::string name, TArgs&&... args)
     {
         static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         auto new_component = std::make_unique<T>(std::forward<TArgs>(args)...);
@@ -54,12 +80,22 @@ public:
         return component_ptr;
     }
 
+    /**
+     * Get a component by name.
+     *
+     * @param name The name of the component.
+     * @return A pointer to the component.
+     */
     T* get_component(std::string name)
     {
         return components[name].get();
     }
 };
 
+/**
+ * A component for rendering text.
+ * Depends on FontManager.
+ */
 class TextComponent : public Component
 {
 public:
@@ -71,11 +107,14 @@ public:
     Vector2 position = {0, 0};
     float rotation = 0.0f;
 
-    void init() override
-    {
-        font_manager = owner->scene->get_manager<FontManager>();
-    }
-
+    /**
+     * Constructor for TextComponent.
+     *
+     * @param text The text to display.
+     * @param font_name The name of the font to use.
+     * @param font_size The size of the font.
+     * @param color The color of the text.
+     */
     TextComponent(std::string text, std::string font_name = "default", int font_size = 20, Color color = WHITE) :
         text(text),
         font_name(font_name),
@@ -84,6 +123,17 @@ public:
     {
     }
 
+    /**
+     * Initialize the text component.
+     */
+    void init() override
+    {
+        font_manager = owner->scene->get_manager<FontManager>();
+    }
+
+    /**
+     * Draw the text.
+     */
     void draw() override
     {
         DrawTextEx(font_manager->get_font(font_name),
@@ -93,8 +143,72 @@ public:
                    1.0f,
                    color);
     }
+
+    /**
+     * Set the text to display.
+     *
+     * @param text The text to display.
+     */
+    void set_text(const std::string& text)
+    {
+        this->text = text;
+    }
+
+    /**
+     * Set the color of the text.
+     *
+     * @param color The color to set.
+     */
+    void set_color(Color color)
+    {
+        this->color = color;
+    }
+
+    /**
+     * Set the font size.
+     *
+     * @param font_size The font size to set.
+     */
+    void set_font_size(int font_size)
+    {
+        this->font_size = font_size;
+    }
+
+    /**
+     * Set the font by name.
+     *
+     * @param font_name The name of the font to set.
+     */
+    void set_font(const std::string& font_name)
+    {
+        this->font_name = font_name;
+    }
+
+    /**
+     * Set the position of the text.
+     *
+     * @param position The position to set.
+     */
+    void set_position(Vector2 position)
+    {
+        this->position = position;
+    }
+
+    /**
+     * Set the rotation of the text.
+     *
+     * @param rotation The rotation to set.
+     */
+    void set_rotation(float rotation)
+    {
+        this->rotation = rotation;
+    }
 };
 
+/**
+ * A component for playing sounds.
+ * Depends on SoundService.
+ */
 class SoundComponent : public Component
 {
 public:
@@ -102,48 +216,96 @@ public:
     Sound sound;
     float volume = 1.0f;
     float pitch = 1.0f;
+    float pan = 0.5f;
 
-    SoundComponent(std::string filename, float volume = 1.0f, float pitch = 1.0f) :
+    /**
+     * Constructor for SoundComponent.
+     *
+     * @param filename The filename of the sound to load.
+     * @param volume The initial volume of the sound.
+     * @param pitch The initial pitch of the sound.
+     */
+    SoundComponent(std::string filename, float volume = 1.0f, float pitch = 1.0f, float pan = 0.5f) :
         filename(filename),
         volume(volume),
-        pitch(pitch)
+        pitch(pitch),
+        pan(pan)
     {
     }
 
+    /**
+     * Initialize the sound component.
+     */
     void init() override
     {
         auto sound_service = owner->scene->get_service<SoundService>();
         sound = sound_service->get_sound(filename);
     }
 
+    /**
+     * Play the sound.
+     */
     void play()
     {
         PlaySound(sound);
     }
 
+    /**
+     * Stop the sound.
+     */
     void stop()
     {
         StopSound(sound);
     }
 
+    /**
+     * Set the volume of the sound.
+     *
+     * @param volume The volume to set.
+     */
     void set_volume(float volume)
     {
         this->volume = volume;
         SetSoundVolume(sound, volume);
     }
 
+    /**
+     * Set the pitch of the sound.
+     *
+     * @param pitch The pitch to set.
+     */
     void set_pitch(float pitch)
     {
         this->pitch = pitch;
         SetSoundPitch(sound, pitch);
     }
 
+    /**
+     * Set the pan of the sound.
+     *
+     * @param pan The pan to set, between 0.0 (left) and 1.0 (right).
+     */
+    void set_pan(float pan)
+    {
+        this->pan = pan;
+        SetSoundPan(sound, pan);
+    }
+
+    /**
+     * Check if the sound is currently playing.
+     *
+     * @return True if the sound is playing, false otherwise.
+     */
     bool is_playing()
     {
         return IsSoundPlaying(sound);
     }
 };
 
+/**
+ * A component for a Box2D physics body.
+ * Depends on PhysicsService.
+ */
 class BodyComponent : public Component
 {
 public:
@@ -152,6 +314,12 @@ public:
     PhysicsService* physics;
 
     BodyComponent() {}
+
+    /**
+     * Constructor for BodyComponent with existing body ID.
+     *
+     * @param id The Box2D body ID.
+     */
     BodyComponent(b2BodyId id) : id(id) {}
 
     /**
@@ -170,6 +338,9 @@ public:
         }
     }
 
+    /**
+     * Initialize the body component.
+     */
     void init() override
     {
         physics = owner->scene->get_service<PhysicsService>();
@@ -179,36 +350,67 @@ public:
         }
     }
 
+    /**
+     * Get the position of the body in meters.
+     */
     b2Vec2 get_position_meters() const
     {
         return b2Body_GetPosition(id);
     }
 
+    /**
+     * Get the position of the body in pixels.
+     */
     Vector2 get_position_pixels() const
     {
         return physics->convert_to_pixels(get_position_meters());
     }
 
+    /**
+     * Get the velocity of the body in meters per second.
+     *
+     * @return The velocity in meters per second.
+     */
     b2Vec2 get_velocity_meters() const
     {
         return b2Body_GetLinearVelocity(id);
     }
 
+    /**
+     * Get the velocity of the body in pixels per second.
+     *
+     * @return The velocity in pixels per second.
+     */
     Vector2 get_velocity_pixels() const
     {
         return physics->convert_to_pixels(get_velocity_meters());
     }
 
+    /**
+     * Set the velocity of the body in meters per second.
+     *
+     * @param meters_per_second The velocity in meters per second.
+     */
     void set_velocity(b2Vec2 meters_per_second)
     {
         b2Body_SetLinearVelocity(id, meters_per_second);
     }
 
+    /**
+     * Set the velocity of the body in pixels per second.
+     *
+     * @param pixels_per_second The velocity in pixels per second.
+     */
     void set_velocity(Vector2 pixels_per_second)
     {
         set_velocity(physics->convert_to_meters(pixels_per_second));
     }
 
+    /**
+     * Get the rotation of the body in degrees.
+     *
+     * @return The rotation in degrees.
+     */
     float get_rotation() const
     {
         auto rot = b2Body_GetRotation(id);
@@ -217,6 +419,7 @@ public:
 
     /**
      * Get a list of all bodies colliding with this one.
+     * https://box2d.org/documentation/md_simulation.html#autotoc_md94
      *
      * @return A list of b2BodyIds that are touching this one. Combine with User Data to get your objects.
      */
@@ -287,6 +490,10 @@ public:
     }
 };
 
+/**
+ * A component for rendering a sprite.
+ * Depends on TextureService.
+ */
 class SpriteComponent : public Component
 {
 public:
@@ -300,15 +507,33 @@ public:
     Color tint = WHITE;
     bool is_active = true;
 
+    /**
+     * Constructor for SpriteComponent.
+     *
+     * @param filename The filename of the texture to load.
+     */
     SpriteComponent(std::string filename) : filename(filename) {}
-    SpriteComponent(BodyComponent* body, std::string filename) : body(body), filename(filename) {}
 
+    /**
+     * Constructor for SpriteComponent with optional BodyComponent to follow.
+     *
+     * @param body The BodyComponent to follow for position and rotation.
+     * @param filename The filename of the texture to load.
+     */
+    SpriteComponent(std::string filename, BodyComponent* body) : filename(filename), body(body) {}
+
+    /**
+     * Initialize the sprite component.
+     */
     void init() override
     {
         auto texture_service = owner->scene->get_service<TextureService>();
         sprite = texture_service->get_texture(filename);
     }
 
+    /**
+     * Draw the sprite.
+     */
     void draw() override
     {
         if (!is_active)
@@ -329,32 +554,62 @@ public:
         DrawTexturePro(sprite, source, dest, origin, rotation, tint);
     }
 
+    /**
+     * Set the position of the sprite.
+     *
+     * @param position The position to set.
+     */
     void set_position(Vector2 position)
     {
         this->position = position;
     }
 
+    /**
+     * Set the rotation of the sprite.
+     *
+     * @param rotation The rotation to set in degrees.
+     */
     void set_rotation(float rotation)
     {
         this->rotation = rotation;
     }
 
+    /**
+     * Set the scale of the sprite.
+     *
+     * @param scale The scale to set.
+     */
     void set_scale(float scale)
     {
         this->scale = scale;
     }
 
+    /**
+     * Set the tint color of the sprite.
+     *
+     * @param tint The tint color to set.
+     */
     void set_tint(Color tint)
     {
         this->tint = tint;
     }
 
+    /**
+     * Set whether the sprite is active or not.
+     * The sprite will not be drawn if inactive.
+     *
+     * @param active True to make the sprite active, false to deactivate it.
+     */
     void set_active(bool active)
     {
         is_active = active;
     }
 };
 
+/**
+ * A class for handling frame-based animations.
+ * Depends on TextureService.
+ */
 class Animation
 {
 public:
@@ -367,6 +622,13 @@ public:
     bool playing = true;
     bool is_active = true;
 
+    /**
+     * Constructor for Animation.
+     *
+     * @param frames The frames of the animation as Texture2D objects.
+     * @param fps The frames per second of the animation.
+     * @param loop Whether the animation should loop or not.
+     */
     Animation(const std::vector<Texture2D>& frames, float fps = 15.0f, bool loop = true) :
         frames(frames),
         fps(fps),
@@ -375,6 +637,14 @@ public:
     {
     }
 
+    /**
+     * Constructor for Animation that loads frames from filenames.
+     *
+     * @param texture_service The TextureService to load textures from.
+     * @param filenames The filenames of the frames of the animation.
+     * @param fps The frames per second of the animation.
+     * @param loop Whether the animation should loop or not.
+     */
     Animation(TextureService* texture_service,
               const std::vector<std::string>& filenames,
               float fps = 15.0f,
@@ -389,6 +659,11 @@ public:
         }
     }
 
+    /**
+     * Update the animation.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     void update(float delta_time)
     {
         if (frames.empty())
@@ -418,6 +693,13 @@ public:
         }
     }
 
+    /**
+     * Draw the animation.
+     *
+     * @param position The position to draw the animation at.
+     * @param rotation The rotation of the animation in degrees.
+     * @param tint The tint color to apply to the animation.
+     */
     void draw(Vector2 position, float rotation = 0.0f, Color tint = WHITE)
     {
         if (!is_active)
@@ -434,6 +716,17 @@ public:
                        tint);
     }
 
+    /**
+     * Draw the animation with a specific origin.
+     *
+     * @param position The position to draw the animation at.
+     * @param origin The origin point for rotation and scaling.
+     * @param rotation The rotation of the animation in degrees.
+     * @param scale The scale of the animation.
+     * @param flip_x Whether to flip the animation horizontally.
+     * @param flip_y Whether to flip the animation vertically.
+     * @param tint The tint color to apply to the animation.
+     */
     void draw(Vector2 position,
               Vector2 origin,
               float rotation = 0.0f,
@@ -462,16 +755,25 @@ public:
                        tint);
     }
 
+    /**
+     * Play the animation.
+     */
     void play()
     {
         playing = true;
     }
 
+    /**
+     * Pause the animation.
+     */
     void pause()
     {
         playing = false;
     }
 
+    /**
+     * Stop the animation and reset to the first frame.
+     */
     void stop()
     {
         playing = false;
@@ -480,6 +782,10 @@ public:
     }
 };
 
+/**
+ * A component for controlling animations.
+ * Depends on TextureService.
+ */
 class AnimationController : public Component
 {
 public:
@@ -495,8 +801,18 @@ public:
 
     AnimationController() = default;
 
+    /**
+     * Constructor for AnimationController that follows a BodyComponent.
+     *
+     * @param body The BodyComponent to follow for position and rotation.
+     */
     AnimationController(BodyComponent* body) : body(body) {}
 
+    /**
+     * Update the animation controller.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     void update(float delta_time) override
     {
         if (current_animation)
@@ -505,6 +821,9 @@ public:
         }
     }
 
+    /**
+     * Draw the current animation.
+     */
     void draw() override
     {
         if (body)
@@ -519,6 +838,12 @@ public:
         }
     }
 
+    /**
+     * Add an existing animation to the controller.
+     *
+     * @param name The name to give the animation.
+     * @param animation The animation to add.
+     */
     void add_animation(const std::string& name, std::unique_ptr<Animation> animation)
     {
         animations[name] = std::move(animation);
@@ -528,7 +853,15 @@ public:
         }
     }
 
-    template <typename... TArgs> Animation* add_animation(const std::string& name, TArgs&&... args)
+    /**
+     * Create an animation and add it to the controller.
+     *
+     * @param name The name to give the animation.
+     * @param args The arguments to forward to the Animation constructor.
+     * @return A pointer to the added animation.
+     */
+    template <typename... TArgs>
+    Animation* add_animation(const std::string& name, TArgs&&... args)
     {
         auto texture_service = owner->scene->get_service<TextureService>();
         auto new_animation = std::make_unique<Animation>(texture_service, std::forward<TArgs>(args)...);
@@ -537,11 +870,20 @@ public:
         return animation_ptr;
     }
 
+    /**
+     * Get an animation by name.
+     *
+     * @param name The name of the animation.
+     * @return A pointer to the animation.
+     */
     Animation* get_animation(const std::string& name)
     {
         return animations[name].get();
     }
 
+    /**
+     * Play the current animation.
+     */
     void play()
     {
         if (current_animation)
@@ -550,6 +892,11 @@ public:
         }
     }
 
+    /**
+     * Play an animation by name.
+     *
+     * @param name The name of the animation to play.
+     */
     void play(const std::string& name)
     {
         auto it = animations.find(name);
@@ -562,6 +909,9 @@ public:
         }
     }
 
+    /**
+     * Pause the current animation.
+     */
     void pause()
     {
         if (current_animation)
@@ -570,6 +920,11 @@ public:
         }
     }
 
+    /**
+     * Set whether the current animation is playing or paused.
+     *
+     * @param play True to play the animation, false to pause it.
+     */
     void set_play(bool play)
     {
         if (current_animation)
@@ -585,6 +940,9 @@ public:
         }
     }
 
+    /**
+     * Stop the current animation.
+     */
     void stop()
     {
         if (current_animation)
@@ -593,37 +951,70 @@ public:
         }
     }
 
+    /**
+     * Set the position of the animation.
+     *
+     * @param pos The position to set.
+     */
     void set_position(Vector2 pos)
     {
         position = pos;
     }
 
+    /**
+     * Set the rotation of the animation.
+     *
+     * @param rot The rotation to set in degrees.
+     */
     void set_rotation(float rot)
     {
         rotation = rot;
     }
 
+    /**
+     * Set the origin of the animation.
+     *
+     * @param orig The origin to set.
+     */
     void set_origin(Vector2 orig)
     {
         origin = orig;
     }
 
+    /**
+     * Set the scale of the animation.
+     *
+     * @param s The scale to set.
+     */
     void set_scale(float s)
     {
         scale = s;
     }
 
+    /**
+     * Set whether to flip the animation horizontally.
+     *
+     * @param fx True to flip horizontally, false otherwise.
+     */
     void set_flip_x(bool fx)
     {
         flip_x = fx;
     }
 
+    /**
+     * Set whether to flip the animation vertically.
+     *
+     * @param fy True to flip vertically, false otherwise.
+     */
     void set_flip_y(bool fy)
     {
         flip_y = fy;
     }
 };
 
+/**
+ * Parameters for MovementComponent.
+ */
 struct MovementParams
 {
     float width = 24.0f; // pixels
@@ -645,6 +1036,10 @@ struct MovementParams
     float jump_buffer = 0.10f; // seconds
 };
 
+/**
+ * A component for 2D platformer movement.
+ * Depends on PhysicsService and BodyComponent.
+ */
 class MovementComponent : public Component
 {
 public:
@@ -662,14 +1057,27 @@ public:
     bool jump_pressed = false;
     bool jump_held = false;
 
+    /**
+     * Constructor for MovementComponent.
+     *
+     * @param p The movement parameters.
+     */
     MovementComponent(MovementParams p) : p(p) {}
 
+    /**
+     * Initialize the movement component.
+     */
     void init() override
     {
         physics = owner->scene->get_service<PhysicsService>();
         body = owner->get_component<BodyComponent>();
     }
 
+    /**
+     * Update the movement component.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     void update(float delta_time) override
     {
         if (!b2Body_IsValid(body->id))
@@ -763,6 +1171,14 @@ public:
         body->set_velocity(v);
     }
 
+    /**
+     * Calculates a value moved towards a target by a maximum delta.
+     *
+     * @param current The current value.
+     * @param target The target value.
+     * @param max_delta The maximum change that can be applied.
+     * @return The new value after moving towards the target.
+     */
     static float move_towards(float current, float target, float max_delta)
     {
         float delta = target - current;
@@ -771,6 +1187,13 @@ public:
         return current + (delta > 0 ? max_delta : -max_delta);
     }
 
+    /**
+     * Set the input for movement.
+     *
+     * @param horizontal_speed The horizontal speed input (-1.0 to 1.0).
+     * @param jump_pressed Whether the jump button was pressed this frame.
+     * @param jump_held Whether the jump button is currently held down.
+     */
     void set_input(float horizontal_speed, bool jump_pressed, bool jump_held)
     {
         move_x = horizontal_speed;

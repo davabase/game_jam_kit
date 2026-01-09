@@ -2,13 +2,20 @@
 
 #include "engine/framework.h"
 
-template <typename T> class MultiManager : public Manager
+/**
+ * For when you want multiple of the same manager.
+ */
+template <typename T>
+class MultiManager : public Manager
 {
 public:
     std::unordered_map<std::string, std::unique_ptr<T>> managers;
 
     MultiManager() = default;
 
+    /**
+     * Initialize all managers.
+     */
     void init() override
     {
         for (auto& manager : managers)
@@ -18,13 +25,27 @@ public:
         Manager::init();
     }
 
+    /**
+     * Add a manager to the MultiManager.
+     *
+     * @param name The name to give the manager.
+     * @param manager The manager to add.
+     */
     void add_manager(std::string name, std::unique_ptr<T> manager)
     {
         static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
         managers[name] = std::move(manager);
     }
 
-    template <typename... TArgs> T* add_manager(std::string name, TArgs&&... args)
+    /**
+     * Create a manager and add it to the MultiManager.
+     *
+     * @param name The name to give the manager.
+     * @param args The arguments to forward to the manager constructor.
+     * @return A pointer to the added manager.
+     */
+    template <typename... TArgs>
+    T* add_manager(std::string name, TArgs&&... args)
     {
         static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
         auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
@@ -33,17 +54,30 @@ public:
         return manager_ptr;
     }
 
+    /**
+     * Get a manager by name.
+     *
+     * @param name The name of the manager.
+     * @return A pointer to the manager.
+     */
     T* get_manager(std::string name)
     {
         return managers[name].get();
     }
 };
 
+/**
+ * Manager for handling fonts so they are not loaded multiple times.
+ */
 class FontManager : public Manager
 {
 public:
     std::unordered_map<std::string, Font> fonts;
 
+    /**
+     * Constructor for FontManager.
+     * Loads the default font.
+     */
     FontManager()
     {
         fonts["default"] = GetFontDefault();
@@ -78,11 +112,23 @@ public:
         return fonts[name];
     }
 
+    /**
+     * Get a font by name.
+     *
+     * @param name The name of the font.
+     * @return A reference to the font.
+     */
     Font& get_font(const std::string& name)
     {
         return fonts[name];
     }
 
+    /**
+     * Set the texture filter for a font.
+     *
+     * @param name The name of the font.
+     * @param filter The filter to set.
+     */
     void set_texture_filter(const std::string& name, int filter)
     {
         if (fonts.find(name) != fonts.end())

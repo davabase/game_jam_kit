@@ -39,7 +39,6 @@ struct RayContextClosest
  * @param normal The normal of the shape at the hit point.
  * @param fraction The fraction of the ray length where the hit occurred.
  * @param context The context for the raycast.
- *
  * @return The fraction of the ray length to continue searching.
  */
 static float raycast_closest_callback(b2ShapeId shape_id, b2Vec2 point, b2Vec2 normal, float fraction, void* context)
@@ -72,7 +71,6 @@ static float raycast_closest_callback(b2ShapeId shape_id, b2Vec2 point, b2Vec2 n
  * @param ignore_body The body to ignore.
  * @param origin The starting point of the ray.
  * @param translation The length of the ray.
- *
  * @return Information about the closest hit.
  */
 RayHit raycast_closest(b2WorldId world, b2BodyId ignore_body, b2Vec2 origin, b2Vec2 translation)
@@ -107,7 +105,6 @@ struct RayContextAll
  * @param normal The normal of the shape at the hit point.
  * @param fraction The fraction of the ray length where the hit occurred.
  * @param context The context for the raycast.
- *
  * @return The fraction of the ray length to continue searching.
  */
 static float raycast_all_callback(b2ShapeId shape_id, b2Vec2 point, b2Vec2 normal, float fraction, void* context)
@@ -133,7 +130,6 @@ static float raycast_all_callback(b2ShapeId shape_id, b2Vec2 point, b2Vec2 norma
  * @param ignore_body The body to ignore.
  * @param origin The starting point of the ray.
  * @param translation The length of the ray.
- *
  * @return Information about the hit bodies.
  */
 std::vector<RayHit> raycast_all(b2WorldId world, b2BodyId ignore_body, b2Vec2 origin, b2Vec2 translation)
@@ -167,7 +163,6 @@ struct ShapeHitContext
  * @param normal The normal of the shape at the hit point.
  * @param fraction The fraction of the ray length where the hit occurred.
  * @param context The context for the raycast.
- *
  * @return The fraction of the ray length to continue searching.
  */
 static bool shape_hit_callback(b2ShapeId shape_id, void* context)
@@ -192,7 +187,6 @@ static bool shape_hit_callback(b2ShapeId shape_id, void* context)
  * @param ignore_body The body to ignore.
  * @param origin The starting point of the ray.
  * @param translation The length of the ray.
- *
  * @return Information about the closest hit.
  */
 std::vector<b2BodyId> shape_hit(b2WorldId world, b2BodyId ignore_body, b2ShapeProxy proxy)
@@ -210,6 +204,15 @@ std::vector<b2BodyId> shape_hit(b2WorldId world, b2BodyId ignore_body, b2ShapePr
     return ctx.hits;
 }
 
+/**
+ * Check for circle shape overlaps in the world.
+ *
+ * @param world The world to check in.
+ * @param ignore_body The body to ignore.
+ * @param center The center of the circle.
+ * @param radius The radius of the circle.
+ * @return A vector of body IDs that overlap with the circle.
+ */
 std::vector<b2BodyId> circle_hit(b2WorldId world, b2BodyId ignore_body, b2Vec2 center, float radius)
 {
     b2Circle circle = {center, radius};
@@ -217,6 +220,16 @@ std::vector<b2BodyId> circle_hit(b2WorldId world, b2BodyId ignore_body, b2Vec2 c
     return shape_hit(world, ignore_body, proxy);
 }
 
+/**
+ * Check for rectangle shape overlaps in the world.
+ *
+ * @param world The world to check in.
+ * @param ignore_body The body to ignore.
+ * @param center The center of the rectangle.
+ * @param size The size of the rectangle.
+ * @param rotation The rotation of the rectangle in degrees.
+ * @return A vector of body IDs that overlap with the rectangle.
+ */
 std::vector<b2BodyId>
 rectangle_hit(b2WorldId world, b2BodyId ignore_body, b2Vec2 center, b2Vec2 size, float rotation = 0.0f)
 {

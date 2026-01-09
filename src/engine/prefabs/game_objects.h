@@ -4,14 +4,28 @@
 #include "engine/prefabs/components.h"
 #include "engine/prefabs/services.h"
 
+/**
+ * A simple static box.
+ */
 class StaticBox : public GameObject
 {
 public:
     b2BodyId body = b2_nullBodyId;
     float x, y, width, height;
 
+    /**
+     * Constructor for StaticBox.
+     *
+     * @param x The center x position in pixels.
+     * @param y The center y position in pixels.
+     * @param width The width of the box in pixels.
+     * @param height The height of the box in pixels.
+     */
     StaticBox(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
 
+    /**
+     * Initialize the StaticBox.
+     */
     void init() override
     {
         auto physics = scene->get_service<PhysicsService>();
@@ -30,12 +44,18 @@ public:
         add_component<BodyComponent>(body);
     }
 
+    /**
+     * Draw the StaticBox as a blue rectangle.
+     */
     void draw() override
     {
-        DrawRectangle(x - width / 2.0f, y - height / 2.0f, width, height, RED);
+        DrawRectangle(x - width / 2.0f, y - height / 2.0f, width, height, BLUE);
     }
 };
 
+/**
+ * A simple dynamic rigid body box.
+ */
 class DynamicBox : public GameObject
 {
 public:
@@ -43,6 +63,15 @@ public:
     float x, y, width, height, rot_deg;
     PhysicsService* physics;
 
+    /**
+     * Constructor for DynamicBox.
+     *
+     * @param x The center x position in pixels.
+     * @param y The center y position in pixels.
+     * @param width The width of the box in pixels.
+     * @param height The height of the box in pixels.
+     * @param rotation The angle of the box in degrees.
+     */
     DynamicBox(float x, float y, float width, float height, float rotation = 0) :
         x(x),
         y(y),
@@ -52,6 +81,13 @@ public:
     {
     }
 
+    /**
+     * Constructor for DynamicBox that takes Vector2s.
+     *
+     * @param position The center of the box in pixels.
+     * @param size The size of the box in pixels.
+     * @param rotation The angle of the box in degrees.
+     */
     DynamicBox(Vector2 position, Vector2 size, float rotation = 0) :
         x(position.x),
         y(position.y),
@@ -61,6 +97,9 @@ public:
     {
     }
 
+    /**
+     * Initialize the DynamicBody.
+     */
     void init() override
     {
         physics = scene->get_service<PhysicsService>();
@@ -82,9 +121,12 @@ public:
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
 
         auto body_component = add_component<BodyComponent>(body);
-        add_component<SpriteComponent>(body_component, "assets/character_green_idle.png");
+        add_component<SpriteComponent>("assets/character_green_idle.png", body_component);
     }
 
+    /**
+     * Draw the DynamicBody as a red rectangle.
+     */
     void draw() override
     {
         float meters_to_pixels = physics->meters_to_pixels;
@@ -99,6 +141,9 @@ public:
     }
 };
 
+/**
+ * A 2D camera that controls the view of the scene.
+ */
 class CameraObject : public GameObject
 {
 public:
@@ -122,6 +167,17 @@ public:
     float offset_top = 100.0f;
     float offset_bottom = 100.0f;
 
+    /**
+     * Constructor for CameraObject.
+     *
+     * @param size The size of the camera view.
+     * @param level_size The size of the level.
+     * @param follow_speed The speed at which the camera follows the target.
+     * @param offset_left The left deadzone offset in pixels.
+     * @param offset_right The right deadzone offset in pixels.
+     * @param offset_top The top deadzone offset in pixels.
+     * @param offset_bottom The bottom deadzone offset in pixels.
+     */
     CameraObject(Vector2 size,
                  Vector2 level_size = {0, 0},
                  Vector2 follow_speed = {1000, 1000},
@@ -139,6 +195,9 @@ public:
     {
     }
 
+    /**
+     * Initialize the camera.
+     */
     void init() override
     {
         camera.zoom = 1.0f;
@@ -148,7 +207,12 @@ public:
         camera.target = target;
     }
 
-    void update(float dt) override
+    /**
+     * Update the camera position based on the target and deadzone.
+     *
+     * @param delta_time The delta time since the last frame.
+     */
+    void update(float delta_time) override
     {
         // Desired camera.target after applying deadzone.
         Vector2 desired = camera.target;
@@ -192,7 +256,7 @@ public:
         }
         else
         {
-            camera.target.x = move_towards(camera.target.x, desired.x, follow_speed.x * dt);
+            camera.target.x = move_towards(camera.target.x, desired.x, follow_speed.x * delta_time);
         }
 
         if (follow_speed.y < 0)
@@ -201,60 +265,90 @@ public:
         }
         else
         {
-            camera.target.y = move_towards(camera.target.y, desired.y, follow_speed.y * dt);
+            camera.target.y = move_towards(camera.target.y, desired.y, follow_speed.y * delta_time);
         }
 
         Vector2 half_view = {size.x / 2.0f * inv_zoom, size.y / 2.0f * inv_zoom};
         if (level_size.x > size.x)
         {
-            camera.target.x = clamp(camera.target.x, half_view.x, level_size.x - half_view.x);
+            camera.target.x = std::max(half_view.x, std::min(level_size.x - half_view.x, camera.target.x));
         }
         if (level_size.y > size.y)
         {
-            camera.target.y = clamp(camera.target.y, half_view.y, level_size.y - half_view.y);
+            camera.target.y = std::max(half_view.y, std::min(level_size.y - half_view.y, camera.target.y));
         }
     }
 
-    float move_towards(float current, float target, float maxDelta)
+    /**
+     * Calculate a value moved towards a target by a maximum delta.
+     *
+     * @param current The current value.
+     * @param target The target value.
+     * @param max_delta The maximum change that can be applied.
+     * @return The new value after moving towards the target.
+     */
+    float move_towards(float current, float target, float max_delta)
     {
         float d = target - current;
-        if (d > maxDelta)
-            return current + maxDelta;
-        if (d < -maxDelta)
-            return current - maxDelta;
+        if (d > max_delta)
+            return current + max_delta;
+        if (d < -max_delta)
+            return current - max_delta;
         return target;
     }
 
-    float clamp(float v, float lo, float hi)
-    {
-        return (v < lo) ? lo : (v > hi) ? hi : v;
-    }
-
+    /**
+     * Set the target position for the camera to follow.
+     *
+     * @param target The target position in pixels.
+     */
     void set_target(Vector2 target)
     {
         this->target = target;
     }
 
+    /**
+     * Set the zoom level of the camera.
+     *
+     * @param zoom The zoom level.
+     */
     void set_zoom(float zoom)
     {
         camera.zoom = zoom;
     }
 
+    /**
+     * Set the rotation angle of the camera.
+     *
+     * @param angle The rotation angle in degrees.
+     */
     void set_rotation(float angle)
     {
         camera.rotation = angle;
     }
 
+    /**
+     * Begin drawing with the camera.
+     * The rest of the Scene should be drawn between draw_begin() and draw_end().
+     */
     void draw_begin()
     {
         BeginMode2D(camera);
     }
 
+    /**
+     * End drawing with the camera.
+     */
     void draw_end()
     {
         EndMode2D();
     }
 
+    /**
+     * Draw the camera's deadzone for debugging.
+     *
+     * @param c The color to draw the deadzone rectangle.
+     */
     void debug_draw(Color c = {0, 255, 0, 120}) const
     {
         float inv_zoom = (camera.zoom != 0.0f) ? (1.0f / camera.zoom) : 1.0f;
@@ -272,17 +366,37 @@ public:
         DrawRectangleLinesEx(r, 2.0f * inv_zoom, c);
     }
 
+    /**
+     * Convert screen coordinates to world coordinates.
+     *
+     * @param point The screen coordinates.
+     * @return The corresponding world coordinates.
+     */
     Vector2 screen_to_world(Vector2 point)
     {
         return GetScreenToWorld2D(point, camera);
     }
 };
 
+/**
+ * A split-screen camera that renders to a texture.
+ */
 class SplitCamera : public CameraObject
 {
 public:
     RenderTexture2D texture;
 
+    /**
+     * Constructor for SplitCamera.
+     *
+     * @param size The size of the camera view.
+     * @param level_size The size of the level.
+     * @param follow_speed The speed at which the camera follows the target.
+     * @param offset_left The left deadzone offset in pixels.
+     * @param offset_right The right deadzone offset in pixels.
+     * @param offset_top The top deadzone offset in pixels.
+     * @param offset_bottom The bottom deadzone offset in pixels.
+     */
     SplitCamera(Vector2 size,
                 Vector2 level_size = {0, 0},
                 Vector2 follow_speed = {1000, 1000},
@@ -299,12 +413,19 @@ public:
         UnloadRenderTexture(texture);
     }
 
+    /**
+     * Initialize the SplitCamera.
+     */
     void init() override
     {
         texture = LoadRenderTexture(size.x, size.y);
         CameraObject::init();
     }
 
+    /**
+     * Begin drawing to the camera's texture.
+     * The rest of the Scene should be drawn between draw_begin() and draw_end().
+     */
     void draw_begin()
     {
         BeginTextureMode(texture);
@@ -312,12 +433,21 @@ public:
         BeginMode2D(camera);
     }
 
+    /**
+     * End drawing to the camera's texture.
+     */
     void draw_end()
     {
         EndMode2D();
         EndTextureMode();
     }
 
+    /**
+     * Draw the camera's texture at the specified position.
+     *
+     * @param x The x position to draw the texture.
+     * @param y The y position to draw the texture.
+     */
     void draw_texture(float x, float y)
     {
         DrawTextureRec(texture.texture,
@@ -326,6 +456,13 @@ public:
                        WHITE);
     }
 
+    /**
+     * Convert screen coordinates to world coordinates relative to a draw position.
+     *
+     * @param draw_position The position where the texture is drawn.
+     * @param point The screen coordinates.
+     * @return The corresponding world coordinates.
+     */
     Vector2 screen_to_world(Vector2 draw_position, Vector2 point)
     {
         auto local_point = point - draw_position;
@@ -333,6 +470,9 @@ public:
     }
 };
 
+/**
+ * Parameters for the Character game object.
+ */
 struct CharacterParams
 {
     // Geometry in pixels
@@ -348,6 +488,9 @@ struct CharacterParams
     float density = 1.0f;
 };
 
+/**
+ * A simple platformer character with movement and animation.
+ */
 class Character : public GameObject
 {
 public:
@@ -365,8 +508,16 @@ public:
     float coyote_timer = 0.0f;
     float jump_buffer_timer = 0.0f;
 
+    /**
+     * Constructor for Character.
+     *
+     * @param p The parameters for the character.
+     */
     Character(CharacterParams p) : p(p) {}
 
+    /**
+     * Initialize the Character.
+     */
     void init() override
     {
         physics = scene->get_service<PhysicsService>();
@@ -417,6 +568,9 @@ public:
         jump_sound = add_component<SoundComponent>("assets/explosionCrunch_000.ogg");
     }
 
+    /**
+     * Update the Character.
+     */
     void update(float delta_time) override
     {
         int gamepad = 0;
@@ -466,6 +620,9 @@ public:
         movement->set_input(move_x, jump_pressed, jump_held);
     }
 
+    /**
+     * Draw the Character as a rectangle.
+     */
     void draw() override
     {
         Color color = movement->grounded ? GREEN : BLUE;

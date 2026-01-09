@@ -3,7 +3,7 @@
 #include <box2d/box2d.h>
 #include <raylib.h>
 
-// Unary add one vector to another
+/// Unary add one vector to another
 inline void operator+=(Vector2& a, Vector2 b)
 {
     a.x += b.x;

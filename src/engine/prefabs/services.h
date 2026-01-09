@@ -1,15 +1,25 @@
 #pragma once
 
-#include "engine/framework.h"
-#include "engine/physics_debug.h"
 #include <LDtkLoader/Project.hpp>
 
-template <typename T> class MultiService : public Service
+#include "engine/framework.h"
+#include "engine/physics_debug.h"
+#include "engine/raycasts.h"
+
+/**
+ * For when you want multiple of the same service.
+ */
+template <typename T>
+class MultiService : public Service
 {
 public:
     std::unordered_map<std::string, std::unique_ptr<T>> services;
 
     MultiService() = default;
+
+    /**
+     * Initialize all services.
+     */
     void init_service() override
     {
         for (auto& service : services)
@@ -19,6 +29,9 @@ public:
         Service::init_service();
     }
 
+    /**
+     * Update all services.
+     */
     void update() override
     {
         for (auto& service : services)
@@ -28,6 +41,9 @@ public:
         Service::update();
     }
 
+    /**
+     * Draw all services.
+     */
     void draw() override
     {
         for (auto& service : services)
@@ -37,13 +53,27 @@ public:
         Service::draw();
     }
 
+    /**
+     * Add a service to the MultiService.
+     *
+     * @param name The name to give the service.
+     * @param service The service to add.
+     */
     void add_service(std::string name, std::unique_ptr<T> service)
     {
         static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
         services[name] = std::move(service);
     }
 
-    template <typename... TArgs> T* add_service(std::string name, TArgs&&... args)
+    /**
+     * Create a service and add it to the MultiService.
+     *
+     * @param name The name to give the service.
+     * @param args The arguments to forward to the service constructor.
+     * @return A pointer to the added service.
+     */
+    template <typename... TArgs>
+    T* add_service(std::string name, TArgs&&... args)
     {
         static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
         auto new_service = std::make_unique<T>(std::forward<TArgs>(args)...);
@@ -52,12 +82,22 @@ public:
         return service_ptr;
     }
 
+    /**
+     * Get a service by name.
+     *
+     * @param name The name of the service.
+     * @return A pointer to the service.
+     */
     T* get_service(std::string name)
     {
         return services[name].get();
     }
 };
 
+/**
+ * Service for managing textures.
+ * Useful when you don't want to load the same texture multiple times.
+ */
 class TextureService : public Service
 {
 public:
@@ -72,6 +112,13 @@ public:
         }
     }
 
+    /**
+     * Get a texture by filename.
+     * Loads the texture if it is not already loaded.
+     *
+     * @param filename The filename of the texture.
+     * @return A reference to the texture.
+     */
     Texture2D& get_texture(const std::string& filename)
     {
         if (textures.find(filename) == textures.end())
@@ -83,6 +130,10 @@ public:
     }
 };
 
+/**
+ * Service for managing sounds.
+ * Useful when you don't want to load the same sound multiple times and want to play overlapping sounds.
+ */
 class SoundService : public Service
 {
 public:
@@ -100,6 +151,14 @@ public:
         }
     }
 
+    /**
+     * Get a sound by filename.
+     * Loads the sound if it is not already loaded.
+     * Creates a new alias if the sound is already loaded to allow overlapping sounds.
+     *
+     * @param filename The filename of the sound.
+     * @return A reference to the sound.
+     */
     Sound& get_sound(const std::string& filename)
     {
         if (sounds.find(filename) == sounds.end())
@@ -117,6 +176,9 @@ public:
     }
 };
 
+/**
+ * Service for managing the physics world.
+ */
 class PhysicsService : public Service
 {
 public:
@@ -128,6 +190,14 @@ public:
     float pixels_to_meters = 1.0f / meters_to_pixels;
     PhysicsDebugRenderer debug_draw;
 
+    /**
+     * Constructor for PhysicsService.
+     *
+     * @param gravity The gravity vector for the physics world.
+     * @param time_step The time step for the physics simulation.
+     * @param sub_steps The number of sub-steps for the physics simulation.
+     * @param meters_to_pixels The scale factor from meters to pixels.
+     */
     PhysicsService(b2Vec2 gravity = b2Vec2{0.0f, 10.0f},
                    float time_step = 1.0f / 60.0f,
                    int sub_steps = 6,
@@ -148,6 +218,9 @@ public:
         }
     }
 
+    /**
+     * Initialize the physics world.
+     */
     void init() override
     {
         b2WorldDef world_def = b2DefaultWorldDef();
@@ -157,7 +230,12 @@ public:
         debug_draw.init(meters_to_pixels);
     }
 
-    void update() override
+    /**
+     * Update the physics world.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
+    void update(float delta_time) override
     {
         if (!b2World_IsValid(world))
         {
@@ -166,28 +244,55 @@ public:
         b2World_Step(world, time_step, sub_steps);
     }
 
+    /**
+     * Draw the physics debug information.
+     */
     void draw_debug()
     {
         debug_draw.debug_draw(world);
     }
 
+    /**
+     * Convert between pixels and meters.
+     *
+     * @param meters The value in meters.
+     * @return The value in pixels.
+     */
     Vector2 convert_to_pixels(b2Vec2 meters) const
     {
         const auto converted = meters * meters_to_pixels;
         return {converted.x, converted.y};
     }
 
+    /**
+     * Convert between pixels and meters.
+     *
+     * @param pixels The value in pixels.
+     * @return The value in meters.
+     */
     b2Vec2 convert_to_meters(Vector2 pixels) const
     {
         const auto converted = pixels * pixels_to_meters;
         return {converted.x, converted.y};
     }
 
+    /**
+     * Convert a length from meters to pixels.
+     *
+     * @param meters The length in meters.
+     * @return The length in pixels.
+     */
     float convert_to_pixels(float meters) const
     {
         return meters * meters_to_pixels;
     }
 
+    /**
+     * Convert a length from pixels to meters.
+     *
+     * @param pixels The length in pixels.
+     * @return The length in meters.
+     */
     float convert_to_meters(float pixels) const
     {
         return pixels * pixels_to_meters;
@@ -199,7 +304,6 @@ public:
      * @param ignore Box2d body to ignore.
      * @param from The start point of the ray.
      * @param to The end point of the ray.
-     *
      * @return A RayHit struct describing the hit.
      */
     RayHit raycast(b2BodyId ignore, Vector2 from, Vector2 to)
@@ -210,6 +314,14 @@ public:
         return raycast_closest(world, ignore, start, translation);
     }
 
+    /**
+     * Check for circle shape overlaps in pixels.
+     *
+     * @param center The center of the circle.
+     * @param radius The radius of the circle.
+     * @param ignore_body The body to ignore.
+     * @return A vector of body IDs that overlap with the circle.
+     */
     std::vector<b2BodyId> circle_overlap(Vector2 center, float radius, b2BodyId ignore_body = b2_nullBodyId)
     {
         auto center_m = convert_to_meters(center);
@@ -217,8 +329,17 @@ public:
         return circle_hit(world, ignore_body, center_m, radius_m);
     }
 
-    std::vector<b2BodyId>
-    rectangle_overlap(Rectangle rectangle, float rotation = 0.0f, b2BodyId ignore_body = b2_nullBodyId)
+    /**
+     * Check for rectangle shape overlaps in pixels.
+     *
+     * @param rectangle The rectangle to check.
+     * @param rotation The rotation of the rectangle in degrees.
+     * @param ignore_body The body to ignore.
+     * @return A vector of body IDs that overlap with the rectangle.
+     */
+    std::vector<b2BodyId> rectangle_overlap(Rectangle rectangle,
+                                            float rotation = 0.0f,
+                                            b2BodyId ignore_body = b2_nullBodyId)
     {
         Vector2 size = {rectangle.width, rectangle.height};
         Vector2 center = {rectangle.x + size.x / 2.0f, rectangle.y + size.y / 2.0f};
@@ -228,6 +349,9 @@ public:
     }
 };
 
+/**
+ * Hash for ldtk::IntPoint to be used in unordered_map/set.
+ */
 struct IntPointHash
 {
     size_t operator()(const ldtk::IntPoint& p) const noexcept
@@ -238,15 +362,29 @@ struct IntPointHash
     }
 };
 
-// Undirected edge (a,b) stored canonically (min,max)
+/**
+ * Undirected edge between two IntPoints, stored canonically (a < b).
+ */
 struct Edge
 {
     ldtk::IntPoint a, b;
 };
+
+/**
+ * Equality operator for Edge.
+ *
+ * @param e1 The first edge.
+ * @param e2 The second edge.
+ * @return True if the edges are equal, false otherwise.
+ */
 static inline bool operator==(const Edge& e1, const Edge& e2)
 {
     return e1.a == e2.a && e1.b == e2.b;
 }
+
+/**
+ * Hash for Edge to be used in unordered_map/set.
+ */
 struct EdgeHash
 {
     size_t operator()(const Edge& e) const noexcept
@@ -258,6 +396,10 @@ struct EdgeHash
     }
 };
 
+/**
+ * Service for managing LDtk levels.
+ * Depends on TextureService and PhysicsService.
+ */
 class LevelService : public Service
 {
 public:
@@ -268,9 +410,16 @@ public:
     std::vector<RenderTexture2D> renderers;
     std::vector<b2BodyId> layer_bodies;
     float scale = 4.0f;
-
     PhysicsService* physics;
 
+    /**
+     * Constructor for LevelService.
+     *
+     * @param project_file The path to the LDtk project file.
+     * @param level_name The name of the level to load.
+     * @param collision_names The names of the layers to create collision bodies for.
+     * @param scale The scale factor for the level.
+     */
     LevelService(std::string project_file,
                  std::string level_name,
                  std::vector<std::string> collision_names,
@@ -298,6 +447,10 @@ public:
         }
     }
 
+    /**
+     * Initialize the level service.
+     * Loads the LDtk project and level, creates textures and collision bodies.
+     */
     void init() override
     {
         if (!FileExists(project_file.c_str()))
@@ -477,33 +630,35 @@ public:
                     }
 
                     // Not really necessary but here we reduce the number of points on a line to just the ends.
-                    std::vector<ldtk::IntPoint> reduced;
-                    reduced.push_back(poly[0]);
-                    b2Vec2 original_normal = {0, 0};
-                    for (int i = 1; i < poly.size(); i++)
-                    {
-                        auto first = poly[i - 1];
-                        auto second = poly[i];
-                        float length = sqrt((second.x - first.x) * (second.x - first.x) +
-                                            (second.y - first.y) * (second.y - first.y));
-                        b2Vec2 normal = {(second.x - first.x) / length, (second.y - first.y) / length};
-                        if (length == 0)
-                        {
-                            normal = {0, 0};
-                        }
-                        if (i == 1)
-                        {
-                            original_normal = normal;
-                        }
+                    // std::vector<ldtk::IntPoint> reduced;
+                    // reduced.push_back(poly[0]);
+                    // b2Vec2 original_normal = {0, 0};
+                    // for (int i = 1; i < poly.size(); i++)
+                    // {
+                    //     auto first = poly[i - 1];
+                    //     auto second = poly[i];
+                    //     float length = sqrt((second.x - first.x) * (second.x - first.x) +
+                    //                         (second.y - first.y) * (second.y - first.y));
+                    //     b2Vec2 normal = {(second.x - first.x) / length, (second.y - first.y) / length};
+                    //     if (length == 0)
+                    //     {
+                    //         normal = {0, 0};
+                    //     }
+                    //     if (i == 1)
+                    //     {
+                    //         original_normal = normal;
+                    //     }
 
-                        if (normal != original_normal)
-                        {
-                            reduced.push_back(first);
-                            original_normal = normal;
-                        }
-                    }
-                    reduced.push_back(poly.back());
-                    loops.push_back(std::move(reduced));
+                    //     if (normal != original_normal)
+                    //     {
+                    //         reduced.push_back(first);
+                    //         original_normal = normal;
+                    //     }
+                    // }
+                    // reduced.push_back(poly.back());
+                    // loops.push_back(std::move(reduced));
+
+                    loops.push_back(std::move(poly));
                 }
             }
 
@@ -546,6 +701,10 @@ public:
         }
     }
 
+    /**
+     * Draw the level.
+     * Draws all the layer renderers.
+     */
     void draw() override
     {
         for (const auto& renderer : renderers)
@@ -562,27 +721,43 @@ public:
         }
     }
 
+    /**
+     * Check if a cell in the layer is solid.
+     * Used for collision generation.
+     *
+     * @param layer The LDtk layer.
+     * @param x The x coordinate of the cell.
+     * @param y The y coordinate of the cell.
+     * @param size The size of the layer in cells.
+     */
     bool is_solid(const ldtk::Layer& layer, int x, int y, const ldtk::IntPoint& size)
     {
         if (x < 0 || y < 0 || x >= size.x || y >= size.y)
-            return false;
-        std::string name = layer.getIntGridVal(x, y).name;
-        for (const auto& collision_name : collision_names)
         {
-            if (name == collision_name)
-            {
-                return true;
-            }
+            return false;
+        }
+
+        std::string name = layer.getIntGridVal(x, y).name;
+        if (std::find(collision_names.begin(), collision_names.end(), name) != collision_names.end())
+        {
+            return true;
         }
         return false;
     };
 
-    // Returns true if solid is on RIGHT side of the loop (correct for Box2D chain one-sided)
+    /**
+     * Check if there is solid on the right side of a loop of corners.
+     * Used to determine loop winding.
+     *
+     * @param loop_corners The corners of the loop.
+     * @param layer The LDtk layer.
+     * @return True if there is solid on the right side of the loop, false otherwise.
+     */
     bool loop_has_solid_on_right(const std::vector<ldtk::IntPoint>& loop_corners, const ldtk::Layer& layer)
     {
         const int cell_size = layer.getCellSize();
 
-        // pick an edge with non-zero length
+        // Pick an edge with non-zero length.
         int n = (int)loop_corners.size();
         for (int i = 0; i < n; ++i)
         {
@@ -593,13 +768,13 @@ public:
             if (dx == 0 && dy == 0)
                 continue;
 
-            // Convert corner coords to pixel coords (scaled)
+            // Convert corner coords to scaled pixel coords.
             float ax = a.x * cell_size * scale;
             float ay = a.y * cell_size * scale;
             float bx = b.x * cell_size * scale;
             float by = b.y * cell_size * scale;
 
-            // edge direction
+            // Edge direction.
             float ex = bx - ax;
             float ey = by - ay;
             float len = std::sqrt(ex * ex + ey * ey);
@@ -610,20 +785,20 @@ public:
             ex /= len;
             ey /= len;
 
-            // right normal = (-ey, ex)
+            // Right normal = (-ey, ex)
             float rx = -ey;
             float ry = ex;
 
-            // midpoint of the edge
+            // Midpoint of the edge.
             float mx = 0.5f * (ax + bx);
             float my = 0.5f * (ay + by);
 
-            // sample a point slightly to the right
-            float eps = 0.25f * cell_size * scale; // quarter-tile in pixels (scaled)
+            // Sample a point slightly to the right, a quarter cell away.
+            float eps = 0.25f * cell_size * scale;
             float sx = mx + rx * eps;
             float sy = my + ry * eps;
 
-            // map sample pixel -> grid cell
+            // Map sample pixel to grid cell.
             int gx = (int)std::floor(sx / (cell_size * scale));
             int gy = (int)std::floor(sy / (cell_size * scale));
 
@@ -687,6 +862,12 @@ public:
         return entities;
     }
 
+    /**
+     * Get all entities across all layers in the level with the given name.
+     *
+     * @param name The name of the entities to get.
+     * @return A vector of LDtk entities.
+     */
     std::vector<const ldtk::Entity*> get_entities_by_name(const std::string& name)
     {
         if (!is_init)
@@ -713,6 +894,12 @@ public:
         return entities;
     }
 
+    /**
+     * Get all entities across all layers in the level with the given tag.
+     *
+     * @param tag The tag of the entities to get.
+     * @return A vector of LDtk entities.
+     */
     std::vector<const ldtk::Entity*> get_entities_by_tag(const std::string& tag)
     {
         if (!is_init)
@@ -739,6 +926,12 @@ public:
         return entities;
     }
 
+    /**
+     * Get the first entity across all layers in the level with the given name.
+     *
+     * @param name The name of the entity to get.
+     * @return A pointer to the LDtk entity, or nullptr if not found.
+     */
     const ldtk::Entity* get_entity_by_name(const std::string& name)
     {
         auto entities = get_entities_by_name(name);
@@ -750,6 +943,12 @@ public:
         return entities[0];
     }
 
+    /**
+     * Get the first entity across all layers in the level with the given tag.
+     *
+     * @param tag The tag of the entity to get.
+     * @return A pointer to the LDtk entity, or nullptr if not found.
+     */
     const ldtk::Entity* get_entity_by_tag(const std::string& tag)
     {
         auto entities = get_entities_by_tag(tag);
@@ -761,32 +960,68 @@ public:
         return entities[0];
     }
 
+    /**
+     * Convert a grid point to pixels.
+     *
+     * @param point The grid point to convert.
+     * @return A Vector2 containing the point in pixels.
+     */
     Vector2 convert_to_pixels(const ldtk::IntPoint& point) const
     {
         return {point.x * scale, point.y * scale};
     }
 
+    /**
+     * Convert a grid point to meters.
+     *
+     * @param point The grid point to convert.
+     * @return A b2Vec2 containing the point in meters.
+     */
     b2Vec2 convert_to_meters(const ldtk::IntPoint& point) const
     {
         return physics->convert_to_meters(convert_to_pixels(point));
     }
 
+    /**
+     * Convert pixels to a grid point.
+     *
+     * @param pixels The pixel position to convert.
+     * @return An IntPoint containing the point in grid coordinates.
+     */
     ldtk::IntPoint convert_to_grid(const Vector2& pixels) const
     {
         return {static_cast<int>(pixels.x / scale), static_cast<int>(pixels.y / scale)};
     }
 
+    /**
+     * Convert meters to a grid point.
+     *
+     * @param meters The meter position to convert.
+     * @return An IntPoint containing the point in grid coordinates.
+     */
     ldtk::IntPoint convert_to_grid(const b2Vec2& meters) const
     {
         auto pixels = physics->convert_to_pixels(meters);
         return {static_cast<int>(pixels.x / scale), static_cast<int>(pixels.y / scale)};
     }
 
+    /**
+     * Get the position of an entity in pixels.
+     *
+     * @param entity The entity to get the position of.
+     * @return A Vector2 containing the position of the entity in pixels.
+     */
     Vector2 get_entity_position(ldtk::Entity* entity)
     {
         return convert_to_pixels(entity->getPosition());
     }
 
+    /**
+     * Get the size of an entity in pixels.
+     *
+     * @param entity The entity to get the size of.
+     * @return A Vector2 containing the size of the entity in pixels.
+     */
     Vector2 get_entity_size(ldtk::Entity* entity)
     {
         return convert_to_pixels(entity->getSize());

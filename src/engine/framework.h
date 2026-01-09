@@ -14,12 +14,22 @@ class GameObject;
 class Scene;
 class Game;
 
-template <typename T> class ObjectPool
+/**
+ * A simple object pool for reusing game objects.
+ */
+template <typename T>
+class ObjectPool
 {
 public:
     std::vector<std::shared_ptr<T>> objects;
 
     ObjectPool() = default;
+
+    /**
+     * Constructor that preallocates a number of objects.
+     *
+     * @param initial_size The number of objects to preallocate.
+     */
     ObjectPool(size_t initial_size)
     {
         objects.reserve(initial_size);
@@ -29,6 +39,11 @@ public:
         }
     }
 
+    /**
+     * Get an object from the pool. If no inactive objects are available, a new one is created.
+     *
+     * @return A shared pointer to the object.
+     */
     std::shared_ptr<T> get_object()
     {
         for (auto& obj : objects)
@@ -52,6 +67,10 @@ public:
     }
 };
 
+/**
+ * The base class for all game object components.
+ * Components are added to game objects to provide functionality.
+ */
 class Component
 {
 public:
@@ -60,11 +79,29 @@ public:
     Component() = default;
     virtual ~Component() = default;
 
+    /**
+     * Lifecycle function called when the component is initialized.
+     */
     virtual void init() {}
+
+    /**
+     * Lifecycle function called every frame to update the component.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     virtual void update(float delta_time) {}
+
+    /**
+     * Lifecycle function called every frame to draw the component.
+     * Called within Raylib BeginDrawing()/EndDrawing() block.
+     */
     virtual void draw() {}
 };
 
+/**
+ * The base class for all game objects.
+ * Game objects are the main entities in the game world.
+ */
 class GameObject
 {
 public:
@@ -76,10 +113,26 @@ public:
     GameObject() = default;
     virtual ~GameObject() = default;
 
+    /**
+     * Lifecycle function called when the game object is initialized.
+     */
     virtual void init() {}
+
+    /**
+     * Lifecycle function called every frame to update the game object.
+     * @param delta_time The time elapsed since the last frame.
+     */
     virtual void update(float delta_time) {}
+
+    /**
+     * Lifecycle function called every frame to draw the game object.
+     * Called within Raylib BeginDrawing()/EndDrawing() block.
+     */
     virtual void draw() {}
 
+    /**
+     * Initialize the game object and its components.
+     */
     virtual void init_object()
     {
         init();
@@ -89,6 +142,11 @@ public:
         }
     }
 
+    /**
+     * Update the game object and its components.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     virtual void update_object(float delta_time)
     {
         if (!is_active)
@@ -102,6 +160,9 @@ public:
         }
     }
 
+    /**
+     * Draw the game object and its components.
+     */
     virtual void draw_object()
     {
         if (!is_active)
@@ -115,7 +176,13 @@ public:
         }
     }
 
-    template <typename T> void add_component(std::unique_ptr<T> component)
+    /**
+     * Add a component to the game object.
+     *
+     * @param component The component to add.
+     */
+    template <typename T>
+    void add_component(std::unique_ptr<T> component)
     {
         static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         component->owner = this;
@@ -126,7 +193,14 @@ public:
         }
     }
 
-    template <typename T, typename... TArgs> T* add_component(TArgs&&... args)
+    /**
+     * Add a component to the game object.
+     *
+     * @param args The arguments to forward to the component constructor.
+     * @return A pointer to the added component.
+     */
+    template <typename T, typename... TArgs>
+    T* add_component(TArgs&&... args)
     {
         static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         auto new_component = std::make_unique<T>(std::forward<TArgs>(args)...);
@@ -135,7 +209,13 @@ public:
         return component_ptr;
     }
 
-    template <typename T> T* get_component()
+    /**
+     * Get a component of the specified type.
+     *
+     * @return A pointer to the component, or nullptr if not found.
+     */
+    template <typename T>
+    T* get_component()
     {
         auto it = components.find(std::type_index(typeid(T)));
         if (it != components.end())
@@ -146,22 +226,42 @@ public:
         return nullptr;
     }
 
+    /**
+     * Add a tag to the game object.
+     *
+     * @param tag The tag to add.
+     */
     void add_tag(const std::string& tag)
     {
         tags.insert(tag);
     }
 
+    /**
+     * Remove a tag from the game object.
+     *
+     * @param tag The tag to remove.
+     */
     void remove_tag(const std::string& tag)
     {
         tags.erase(tag);
     }
 
+    /**
+     * Check if the game object has the specified tag.
+     *
+     * @param tag The tag to check.
+     * @return True if the game object has the tag, false otherwise.
+     */
     bool has_tag(const std::string& tag) const
     {
         return tags.find(tag) != tags.end();
     }
 };
 
+/**
+ * The base class for all services.
+ * Services provide Scene level functionality and are accessible by all game objects in the scene.
+ */
 class Service
 {
 public:
@@ -171,10 +271,27 @@ public:
     Service() = default;
     virtual ~Service() = default;
 
+    /**
+     * Lifecycle function called when the service is initialized.
+     */
     virtual void init() {}
-    virtual void update() {}
+
+    /**
+     * Lifecycle function called every frame to update the service.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
+    virtual void update(float delta_time) {}
+
+    /**
+     * Lifecycle function called every frame to draw the service.
+     * Called within Raylib BeginDrawing()/EndDrawing() block.
+     */
     virtual void draw() {}
 
+    /**
+     * Initialize the service.
+     */
     virtual void init_service() final
     {
         if (is_init)
@@ -186,6 +303,10 @@ public:
     }
 };
 
+/**
+ * The base class for all managers.
+ * Managers provide global functionality and are accessible by all scenes and game objects.
+ */
 class Manager
 {
 public:
@@ -194,7 +315,14 @@ public:
     Manager() = default;
     virtual ~Manager() = default;
 
+    /**
+     * Lifecycle function called when the manager is initialized.
+     */
     virtual void init() {}
+
+    /**
+     * Initialize the manager.
+     */
     virtual void init_manager() final
     {
         if (is_init)
@@ -206,6 +334,10 @@ public:
     }
 };
 
+/**
+ * The base class for all scenes.
+ * Scenes contain game objects and services, and manage the lifecycle for each.
+ */
 class Scene
 {
 public:
@@ -217,11 +349,33 @@ public:
     Scene() = default;
     virtual ~Scene() = default;
 
+    /**
+     * Lifecycle function called to initialize services.
+     * This happens before the scene's init() function so that services are ready for game objects.
+     */
     virtual void init_services() {}
+
+    /**
+     * Lifecycle function called when the scene is initialized.
+     */
     virtual void init() {}
+
+    /**
+     * Lifecycle function called every frame to update the scene.
+     * @param delta_time The time elapsed since the last frame.
+     */
     virtual void update(float delta_time) {}
+
+    /**
+     * Lifecycle function called every frame to draw the scene.
+     * Called within Raylib BeginDrawing()/EndDrawing() block.
+     */
     virtual void draw() {}
 
+    /**
+     * Initialize the scene, its services, and its game objects.
+     * Can be overriden for custom initialization sequences.
+     */
     virtual void init_scene()
     {
         if (is_init)
@@ -244,13 +398,19 @@ public:
         is_init = true;
     }
 
+    /**
+     * Update the scene, its services, and its game objects.
+     * Can be overriden for custom update sequences.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     virtual void update_scene(float delta_time)
     {
         update(delta_time);
 
         for (auto& service : services)
         {
-            service.second->update();
+            service.second->update(delta_time);
         }
         for (auto& game_object : game_objects)
         {
@@ -258,6 +418,10 @@ public:
         }
     }
 
+    /**
+     * Draw the scene, its services, and its game objects.
+     * Can be overriden for custom draw sequences, especially when using cameras.
+     */
     virtual void draw_scene()
     {
         draw();
@@ -272,25 +436,49 @@ public:
         }
     }
 
+    /**
+     * Lifecycle function called when the scene is transitioned to.
+     */
     virtual void on_enter() {}
+
+    /**
+     * Lifecycle function called when the scene is transitioned away from.
+     */
     virtual void on_exit() {}
 
+    /**
+     * Add a game object to the scene.
+     *
+     * @param game_object The game object to add.
+     */
     void add_game_object(std::shared_ptr<GameObject> game_object)
     {
         game_object->scene = this;
         game_objects.push_back(game_object);
     }
 
-    template <typename T, typename... TArgs> T* add_game_object(TArgs&&... args)
+    /**
+     * Create a game object and add it to the scene.
+     *
+     * @param args The arguments to forward to the game object constructor.
+     * @return A pointer to the added game object.
+     */
+    template <typename T, typename... TArgs>
+    std::shared_ptr<T> add_game_object(TArgs&&... args)
     {
         static_assert(std::is_base_of<GameObject, T>::value, "T must derive from GameObject");
         auto new_object = std::make_shared<T>(std::forward<TArgs>(args)...);
-        T* object_ptr = new_object.get();
         add_game_object(new_object);
-        return object_ptr;
+        return new_object;
     }
 
-    template <typename T> void add_service(std::unique_ptr<T> service)
+    /**
+     * Add a service to the scene.
+     *
+     * @param service The service to add.
+     */
+    template <typename T>
+    void add_service(std::unique_ptr<T> service)
     {
         static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
         service->scene = this;
@@ -301,7 +489,14 @@ public:
         }
     }
 
-    template <typename T, typename... TArgs> T* add_service(TArgs&&... args)
+    /**
+     * Create a service and add it to the scene.
+     *
+     * @param args The arguments to forward to the service constructor.
+     * @return A pointer to the added service.
+     */
+    template <typename T, typename... TArgs>
+    T* add_service(TArgs&&... args)
     {
         static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
         auto new_service = std::make_unique<T>(std::forward<TArgs>(args)...);
@@ -310,7 +505,13 @@ public:
         return service_ptr;
     }
 
-    template <typename T> T* get_service()
+    /**
+     * Get a service of the specified type.
+     *
+     * @return A pointer to the service.
+     */
+    template <typename T>
+    T* get_service()
     {
         auto it = services.find(std::type_index(typeid(T)));
         if (it != services.end())
@@ -326,7 +527,13 @@ public:
         return nullptr;
     }
 
-    template <typename T> T* get_manager()
+    /**
+     * Get a manager of the specified type from the game.
+     *
+     * @return A pointer to the manager.
+     */
+    template <typename T>
+    T* get_manager()
     {
         if (!game)
         {
@@ -335,6 +542,12 @@ public:
         return game->get_manager<T>();
     }
 
+    /**
+     * Get all game objects with the specified tag.
+     *
+     * @param tag The tag to search for.
+     * @return A vector of pointers to the game objects with the specified tag.
+     */
     std::vector<GameObject*> get_game_objects_with_tag(const std::string& tag)
     {
         std::vector<GameObject*> tagged_objects;
@@ -349,6 +562,10 @@ public:
     }
 };
 
+/**
+ * The main game class.
+ * Manages scenes and global managers.
+ */
 class Game
 {
 public:
@@ -361,6 +578,9 @@ public:
     Game() = default;
     ~Game() = default;
 
+    /**
+     * Initialize all managers.
+     */
     void init()
     {
         for (auto& manager : managers)
@@ -369,6 +589,11 @@ public:
         }
     }
 
+    /**
+     * Update the current scene.
+     *
+     * @param delta_time The time elapsed since the last frame.
+     */
     void update(float delta_time)
     {
         if (current_scene)
@@ -398,7 +623,13 @@ public:
         }
     }
 
-    template <typename T> void add_manager(std::unique_ptr<T> manager)
+    /**
+     * Add a manager to the game.
+     *
+     * @param manager The manager to add.
+     */
+    template <typename T>
+    void add_manager(std::unique_ptr<T> manager)
     {
         static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
         auto [it, inserted] = managers.emplace(std::type_index(typeid(T)), std::move(manager));
@@ -408,7 +639,14 @@ public:
         }
     }
 
-    template <typename T, typename... TArgs> T* add_manager(TArgs&&... args)
+    /**
+     * Create a manager and add it to the game.
+     *
+     * @param args The arguments to forward to the manager constructor.
+     * @return A pointer to the added manager.
+     */
+    template <typename T, typename... TArgs>
+    T* add_manager(TArgs&&... args)
     {
         static_assert(std::is_base_of<Manager, T>::value, "T must derive from Manager");
         auto new_manager = std::make_unique<T>(std::forward<TArgs>(args)...);
@@ -417,7 +655,13 @@ public:
         return manager_ptr;
     }
 
-    template <typename T> T* get_manager()
+    /**
+     * Get a manager of the specified type.
+     *
+     * @return A pointer to the manager.
+     */
+    template <typename T>
+    T* get_manager()
     {
         auto it = managers.find(std::type_index(typeid(T)));
         if (it != managers.end())
@@ -433,6 +677,12 @@ public:
         return nullptr;
     }
 
+    /**
+     * Add a scene to the game.
+     *
+     * @param name The name to give the scene.
+     * @param scene The scene to add.
+     */
     void add_scene(std::string name, std::unique_ptr<Scene> scene)
     {
         scenes[name] = std::move(scene);
@@ -444,7 +694,15 @@ public:
         }
     }
 
-    template <typename T, typename... TArgs> T* add_scene(std::string name, TArgs&&... args)
+    /**
+     * Create a scene and add it to the game.
+     *
+     * @param name The name to give the scene.
+     * @param args The arguments to forward to the scene constructor.
+     * @return A pointer to the added scene.
+     */
+    template <typename T, typename... TArgs>
+    T* add_scene(std::string name, TArgs&&... args)
     {
         static_assert(std::is_base_of<Scene, T>::value, "T must derive from Scene");
         auto new_scene = std::make_unique<T>(std::forward<TArgs>(args)...);
@@ -457,6 +715,13 @@ public:
         return scene_ptr;
     }
 
+    /**
+     * Transition to the specified scene by name.
+     * The transition occurs at the end of the current update cycle.
+     *
+     * @param name The name of the scene to transition to.
+     * @return A pointer to the next scene.
+     */
     Scene* go_to_scene(const std::string& name)
     {
         auto it = scenes.find(name);
@@ -471,6 +736,12 @@ public:
         return next_scene;
     }
 
+    /**
+     * Transition to the next scene in the scene order.
+     * Loops back to the first scene if at the end.
+     *
+     * @return A pointer to the next scene.
+     */
     Scene* go_to_scene_next()
     {
         // Find the next scene.
@@ -504,6 +775,12 @@ public:
         return next_scene;
     }
 
+    /**
+     * Transition to the previous scene in the scene order.
+     * Loops back to the last scene if at the beginning.
+     *
+     * @return A pointer to the previous scene.
+     */
     Scene* go_to_scene_previous()
     {
         // Find the previous scene.
