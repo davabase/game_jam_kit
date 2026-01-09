@@ -5,8 +5,6 @@
 
 class Playground : public Scene {
 public:
-    DebugRenderer debug;
-
     void init_services() override {
         add_service<TextureService>();
         add_service<SoundService>();
@@ -47,8 +45,6 @@ public:
 
         auto split_camera2 = add_game_object<SplitCamera>(Vector2{400, 600}, level->get_size());
         split_camera2->add_tag("camera");
-
-        debug.init();
     }
 
     void update(float delta_time) override {
@@ -76,7 +72,7 @@ public:
         // The scene needs to be rendered for each camera.
         camera->draw_begin();
         Scene::draw_scene();
-        debug.debug_draw(physics->world);
+        physics->draw_debug();
         auto local = camera->screen_to_world({0, 0}, GetMousePosition());
         Rectangle rec = {local.x - 10, local.y - 10, 20, 20};
         DrawRectangle(rec.x, rec.y, rec.width, rec.height, MAGENTA);

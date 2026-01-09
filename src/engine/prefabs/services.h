@@ -2,6 +2,7 @@
 
 #include <LDtkLoader/Project.hpp>
 #include "engine/framework.h"
+#include "engine/physics_debug.h"
 
 template <typename T>
 class MultiService : public Service {
@@ -103,6 +104,7 @@ public:
     int sub_steps = 6;
     float meters_to_pixels = 30.0f;
     float pixels_to_meters = 1.0f / meters_to_pixels;
+    PhysicsDebugRenderer debug_draw;
 
     PhysicsService(b2Vec2 gravity = b2Vec2{0.0f, 10.0f}, float time_step = 1.0f / 60.0f, int sub_steps = 6, float meters_to_pixels = 30.0f) :
          gravity(gravity), time_step(time_step), sub_steps(sub_steps), meters_to_pixels(meters_to_pixels), pixels_to_meters(1.0f / meters_to_pixels) {}
@@ -118,6 +120,7 @@ public:
         world_def.gravity = gravity;
         world_def.contactHertz = 120;
         world = b2CreateWorld(&world_def);
+        debug_draw.init(meters_to_pixels);
     }
 
     void update() override {
@@ -125,6 +128,10 @@ public:
             return;
         }
         b2World_Step(world, time_step, sub_steps);
+    }
+
+    void draw_debug() {
+        debug_draw.debug_draw(world);
     }
 
     Vector2 convert_to_pixels(b2Vec2 meters) const {
