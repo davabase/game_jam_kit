@@ -1394,6 +1394,35 @@ public:
     }
 };
 
+class TextureManager : public Manager {
+public:
+    std::unordered_map<std::string, Texture2D> textures;
+
+    TextureManager() = default;
+    ~TextureManager() {
+        for (auto& pair : textures) {
+            UnloadTexture(pair.second);
+        }
+    }
+
+    Texture2D& load_texture(const std::string& filename) {
+        if (textures.find(filename) != textures.end()) {
+            return textures[filename];
+        }
+
+        Texture2D texture = LoadTexture(filename.c_str());
+        textures[filename] = texture;
+        return textures[filename];
+    }
+
+    Texture2D& get_texture(const std::string& filename) {
+        if (textures.find(filename) == textures.end()) {
+            load_texture(filename);
+        }
+        return textures[filename];
+    }
+};
+
 class TextComponent : public Component {
 public:
     FontManager* font_manager;
