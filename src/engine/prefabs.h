@@ -132,6 +132,35 @@ public:
     }
 };
 
+class TextureService : public Service {
+public:
+    std::unordered_map<std::string, Texture2D> textures;
+
+    TextureService() = default;
+    ~TextureService() {
+        for (auto& pair : textures) {
+            UnloadTexture(pair.second);
+        }
+    }
+
+    Texture2D& load_texture(const std::string& filename) {
+        if (textures.find(filename) != textures.end()) {
+            return textures[filename];
+        }
+
+        Texture2D texture = LoadTexture(filename.c_str());
+        textures[filename] = texture;
+        return textures[filename];
+    }
+
+    Texture2D& get_texture(const std::string& filename) {
+        if (textures.find(filename) == textures.end()) {
+            load_texture(filename);
+        }
+        return textures[filename];
+    }
+};
+
 class PhysicsService : public Service {
 public:
     b2WorldId world = b2_nullWorldId;
@@ -423,7 +452,8 @@ public:
             if (!FileExists(tileset_file.c_str())) {
                 TraceLog(LOG_FATAL, "Tileset file not found: %s", tileset_file.c_str());
             }
-            Texture2D texture = LoadTexture(tileset_file.c_str());
+            auto texture_service = scene->get_service<TextureService>();
+            Texture2D texture = texture_service->get_texture(tileset_file);
             RenderTexture2D renderer = LoadRenderTexture(level.size.x, level.size.y);
 
             // Draw all the tiles.
@@ -446,10 +476,7 @@ public:
                 DrawTextureRec(texture, src, dest, WHITE);
             }
             EndTextureMode();
-
-            UnloadTexture(texture);
             renderers.push_back(renderer);
-
 
             // Create bodies.
             const auto& size = layer.getGridSize();
@@ -833,12 +860,9 @@ public:
     SpriteComponent(std::string filename) : filename(filename) {}
     SpriteComponent(BodyComponent* body, std::string filename) : body(body), filename(filename) {}
 
-    ~SpriteComponent() {
-        UnloadTexture(sprite);
-    }
-
     void init() override {
-        sprite = LoadTexture(filename.c_str());
+        auto texture_service = owner->scene->get_service<TextureService>();
+        sprite = texture_service->get_texture(filename);
     }
 
     void draw() override {
@@ -892,15 +916,9 @@ public:
 
     Animation(const std::vector<Texture2D>& frames, float fps = 15.0f, bool loop = true) : frames(frames), fps(fps), frame_timer(1.0f / fps), loop(loop) {}
 
-    Animation(const std::vector<std::string>& filenames, float fps = 15.0f, bool loop = true) : fps(fps), frame_timer(1.0f / fps), loop(loop) {
+    Animation(TextureService* texture_service, const std::vector<std::string>& filenames, float fps = 15.0f, bool loop = true) : fps(fps), frame_timer(1.0f / fps), loop(loop) {
         for (const auto& filename : filenames) {
-            frames.push_back(LoadTexture(filename.c_str()));
-        }
-    }
-
-    ~Animation() {
-        for (auto& frame : frames) {
-            UnloadTexture(frame);
+            frames.push_back(texture_service->get_texture(filename));
         }
     }
 
@@ -1016,7 +1034,8 @@ public:
 
     template <typename... TArgs>
     Animation* add_animation(const std::string& name, TArgs&&... args) {
-        auto new_animation = std::make_unique<Animation>(std::forward<TArgs>(args)...);
+        auto texture_service = owner->scene->get_service<TextureService>();
+        auto new_animation = std::make_unique<Animation>(texture_service, std::forward<TArgs>(args)...);
         Animation* animation_ptr = new_animation.get();
         add_animation(name, std::move(new_animation));
         return animation_ptr;
@@ -1394,35 +1413,6 @@ public:
     }
 };
 
-class TextureManager : public Manager {
-public:
-    std::unordered_map<std::string, Texture2D> textures;
-
-    TextureManager() = default;
-    ~TextureManager() {
-        for (auto& pair : textures) {
-            UnloadTexture(pair.second);
-        }
-    }
-
-    Texture2D& load_texture(const std::string& filename) {
-        if (textures.find(filename) != textures.end()) {
-            return textures[filename];
-        }
-
-        Texture2D texture = LoadTexture(filename.c_str());
-        textures[filename] = texture;
-        return textures[filename];
-    }
-
-    Texture2D& get_texture(const std::string& filename) {
-        if (textures.find(filename) == textures.end()) {
-            load_texture(filename);
-        }
-        return textures[filename];
-    }
-};
-
 class TextComponent : public Component {
 public:
     FontManager* font_manager;
@@ -1433,8 +1423,12 @@ public:
     Vector2 position = {0, 0};
     float rotation = 0.0f;
 
-    TextComponent(FontManager* font_manager, std::string text, std::string font_name = "default", int font_size = 20, Color color = WHITE)
-        : font_manager(font_manager), text(text), font_name(font_name), font_size(font_size), color(color) {}
+    void init() override {
+        font_manager = owner->scene->get_manager<FontManager>();
+    }
+
+    TextComponent(std::string text, std::string font_name = "default", int font_size = 20, Color color = WHITE)
+        : text(text), font_name(font_name), font_size(font_size), color(color) {}
 
     void draw() override {
         DrawTextEx(font_manager->get_font(font_name), text.c_str(), position, static_cast<float>(font_size), 1.0f, color);
@@ -1648,7 +1642,7 @@ public:
         animation->play("walk");
         animation->set_scale(0.35f);
 
-        text_component = add_component<TextComponent>(scene->get_manager<FontManager>(), "Character", "Roboto", 128, WHITE);
+        text_component = add_component<TextComponent>("Character", "Roboto", 128, WHITE);
         text_component->position = {p.position.x, p.position.y - p.height / 2.0f - 20.0f};
     }
 

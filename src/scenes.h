@@ -8,6 +8,7 @@ public:
     DebugRenderer debug;
 
     void init_services() override {
+        add_service<TextureService>();
         add_service<PhysicsService>();
         std::vector<std::string> collision_names = {"walls"};
         add_service<LevelService>("assets/AutoLayers_1_basic.ldtk", "AutoLayer", collision_names);
