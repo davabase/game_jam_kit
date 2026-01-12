@@ -499,8 +499,7 @@ public:
     BodyComponent* body;
     MovementComponent* movement;
     AnimationController* animation;
-    TextComponent* text_component;
-    SoundComponent* jump_sound;
+    // SoundComponent* jump_sound;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -562,10 +561,7 @@ public:
         animation->play("walk");
         animation->set_scale(0.35f);
 
-        text_component = add_component<TextComponent>("Character", "Roboto", 128, WHITE);
-        text_component->position = {p.position.x, p.position.y - p.height / 2.0f - 20.0f};
-
-        jump_sound = add_component<SoundComponent>("assets/explosionCrunch_000.ogg");
+        // jump_sound = add_component<SoundComponent>("assets/explosionCrunch_000.ogg");
     }
 
     /**
@@ -612,10 +608,10 @@ public:
             animation->play("idle");
         }
 
-        if (jump_pressed)
-        {
-            jump_sound->play();
-        }
+        // if (jump_pressed)
+        // {
+        //     jump_sound->play();
+        // }
 
         movement->set_input(move_x, jump_pressed, jump_held);
     }

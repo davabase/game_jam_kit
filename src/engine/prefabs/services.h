@@ -502,7 +502,8 @@ public:
             // Draw all the tiles.
             const auto& tiles_vector = layer.allTiles();
             BeginTextureMode(renderer);
-            ClearBackground(MAGENTA);
+            // Clear with transparency so we can render layers on top of each other.
+            ClearBackground({0, 0, 0, 0});
             for (const auto& tile : tiles_vector)
             {
                 const auto& position = tile.getPosition();
@@ -707,8 +708,10 @@ public:
      */
     void draw() override
     {
-        for (const auto& renderer : renderers)
+        // Draw renderers in reverse.
+        for (int i = (int)renderers.size() - 1; i >= 0; i--)
         {
+            const auto& renderer = renderers[i];
             Rectangle src = {0,
                              0,
                              static_cast<float>(renderer.texture.width),

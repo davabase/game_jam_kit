@@ -1,4 +1,4 @@
-#include "scenes.h"
+#include "samples/fighting_game.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -15,19 +15,18 @@ void update()
 int main(int argc, char** argv)
 {
     // Initialize the window
-    const int screen_width = 800;
-    const int screen_height = 600;
+    const int screen_width = 512 * 4;
+    const int screen_height = 256 * 4;
     InitWindow(screen_width, screen_height, "Game Jam Kit");
     InitAudioDevice();
     SetTargetFPS(60);
 
     auto font_manager = game.add_manager<FontManager>();
-    font_manager->load_font("Roboto", "assets/Roboto.ttf", 64);
-    font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
+    // font_manager->load_font("Roboto", "assets/Roboto.ttf", 64);
+    // font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
     game.init();
 
-    game.add_scene<Playground>("playground");
-    game.add_scene<Playground>("playground2");
+    game.add_scene<Fighting>("fighting");
 
 // Main game loop
 #ifdef __EMSCRIPTEN__
