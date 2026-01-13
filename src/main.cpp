@@ -15,18 +15,14 @@ void update()
 int main(int argc, char** argv)
 {
     // Initialize the window
-    const int screen_width = 512 * 4;
-    const int screen_height = 256 * 4;
-    InitWindow(screen_width, screen_height, "Game Jam Kit");
-    InitAudioDevice();
-    SetTargetFPS(60);
-
+    game.add_manager<WindowManager>(1280, 720, "Game Jam Kit");
     auto font_manager = game.add_manager<FontManager>();
-    // font_manager->load_font("Roboto", "assets/Roboto.ttf", 64);
-    // font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
     game.init();
 
-    game.add_scene<Fighting>("fighting");
+    // Game::init initializes all managers, so we can load fonts now.
+    font_manager->load_font("Roboto", "assets/Roboto.ttf", 64);
+    font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
+    game.add_scene<FightingScene>("fighting");
 
 // Main game loop
 #ifdef __EMSCRIPTEN__

@@ -409,7 +409,7 @@ public:
     std::vector<std::string> collision_names;
     std::vector<RenderTexture2D> renderers;
     std::vector<b2BodyId> layer_bodies;
-    float scale = 4.0f;
+    float scale = 1.0f;
     PhysicsService* physics;
 
     /**
@@ -423,7 +423,7 @@ public:
     LevelService(std::string project_file,
                  std::string level_name,
                  std::vector<std::string> collision_names,
-                 float scale = 4.0f) :
+                 float scale = 1.0f) :
         project_file(project_file),
         level_name(level_name),
         collision_names(collision_names),

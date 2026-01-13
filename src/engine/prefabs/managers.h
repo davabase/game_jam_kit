@@ -137,3 +137,77 @@ public:
         }
     }
 };
+
+/**
+ * Manager for handling the application window.
+ */
+class WindowManager : public Manager
+{
+public:
+    int width = 1280;
+    int height = 720;
+    std::string title = "My Game";
+    int target_fps = 60;
+
+    WindowManager(int w, int h, const std::string& t, int fps = 60) : width(w), height(h), title(t), target_fps(fps) {}
+
+    /**
+     * Initialize the window.
+     */
+    void init() override
+    {
+        InitWindow(width, height, title.c_str());
+        InitAudioDevice();
+        SetTargetFPS(target_fps);
+        Manager::init();
+    }
+
+    /**
+     * Set the window title.
+     *
+     * @param t The new title.
+     */
+    void set_title(const std::string& t)
+    {
+        title = t;
+        SetWindowTitle(title.c_str());
+    }
+
+    /**
+     * Get the window width.
+     *
+     * @return The window width.
+     */
+    float get_width() const
+    {
+        return static_cast<float>(width);
+    }
+
+    /**
+     * Get the window height.
+     */
+    float get_height() const
+    {
+        return static_cast<float>(height);
+    }
+
+    /**
+     * Get the window size.
+     *
+     * @return The window size as a Vector2.
+     */
+    Vector2 get_size() const
+    {
+        return Vector2{(float)width, (float)height};
+    }
+
+    /**
+     * Get the window aspect ratio.
+     *
+     * @return The window aspect ratio.
+     */
+    float get_aspect_ratio() const
+    {
+        return static_cast<float>(width) / static_cast<float>(height);
+    }
+};

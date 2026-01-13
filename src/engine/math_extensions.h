@@ -54,6 +54,12 @@ inline Vector2 operator*(Vector2 a, float b)
     return {a.x * b, a.y * b};
 }
 
+/// Binary scalar and vector division
+inline Vector2 operator/(Vector2 a, float b)
+{
+    return {a.x / b, a.y / b};
+}
+
 /// Binary vector equality
 inline bool operator==(Vector2 a, Vector2 b)
 {

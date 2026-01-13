@@ -39,6 +39,8 @@ public:
 
         b2Polygon body_polygon = b2MakeBox(width / 2.0f * pixels_to_meters, height / 2.0f * pixels_to_meters);
         b2ShapeDef box_shape_def = b2DefaultShapeDef();
+        // Needed for one-way platforms.
+        box_shape_def.enablePreSolveEvents = true;
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
 
         add_component<BodyComponent>(body);
@@ -526,7 +528,7 @@ public:
                 b2BodyDef body_def = b2DefaultBodyDef();
                 body_def.type = b2_dynamicBody;
                 body_def.fixedRotation = true;
-                body_def.isBullet = true;
+                // body_def.isBullet = true;
                 body_def.linearDamping = 0.0f;
                 body_def.angularDamping = 0.0f;
                 body_def.position = physics->convert_to_meters(p.position);
