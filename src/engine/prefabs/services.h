@@ -249,7 +249,7 @@ public:
      */
     void draw_debug()
     {
-        debug_draw.debug_draw(world);
+        debug_draw.draw_debug(world);
     }
 
     /**

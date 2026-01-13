@@ -181,10 +181,10 @@ public:
     CameraObject(Vector2 size,
                  Vector2 level_size = {0, 0},
                  Vector2 follow_speed = {1000, 1000},
-                 float offset_left = 150,
-                 float offset_right = 150,
-                 float offset_top = 100,
-                 float offset_bottom = 100) :
+                 float offset_left = 50,
+                 float offset_right = 50,
+                 float offset_top = 35,
+                 float offset_bottom = 35) :
         size(size),
         level_size(level_size),
         follow_speed(follow_speed),
@@ -349,7 +349,7 @@ public:
      *
      * @param c The color to draw the deadzone rectangle.
      */
-    void debug_draw(Color c = {0, 255, 0, 120}) const
+    void draw_debug(Color c = {0, 255, 0, 120}) const
     {
         float inv_zoom = (camera.zoom != 0.0f) ? (1.0f / camera.zoom) : 1.0f;
         float dz_left_w = offset_left * inv_zoom;
@@ -499,7 +499,6 @@ public:
     BodyComponent* body;
     MovementComponent* movement;
     AnimationController* animation;
-    // SoundComponent* jump_sound;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -551,17 +550,6 @@ public:
         mp.width = p.width;
         mp.height = p.height;
         movement = add_component<MovementComponent>(mp);
-
-        animation = add_component<AnimationController>(body);
-        animation->add_animation("idle", std::vector<std::string>{"assets/character_green_idle.png"}, 1.0f);
-        animation->add_animation(
-            "walk",
-            std::vector<std::string>{"assets/character_green_walk_a.png", "assets/character_green_walk_b.png"},
-            5.0f);
-        animation->play("walk");
-        animation->set_scale(0.35f);
-
-        // jump_sound = add_component<SoundComponent>("assets/explosionCrunch_000.ogg");
     }
 
     /**
@@ -590,28 +578,6 @@ public:
         {
             move_x = -1.0f;
         }
-
-        if (move_x < 0.0f)
-        {
-            animation->set_flip_x(true);
-        }
-        else if (move_x > 0.0f)
-        {
-            animation->set_flip_x(false);
-        }
-        if (fabsf(move_x) > 0.1f)
-        {
-            animation->play("walk");
-        }
-        else
-        {
-            animation->play("idle");
-        }
-
-        // if (jump_pressed)
-        // {
-        //     jump_sound->play();
-        // }
 
         movement->set_input(move_x, jump_pressed, jump_held);
     }

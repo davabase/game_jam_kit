@@ -850,6 +850,8 @@ public:
         if (!current_animation)
         {
             current_animation = animations[name].get();
+            auto sprite = current_animation->frames[current_animation->current_frame];
+            origin = {sprite.width / 2.0f, sprite.height / 2.0f};
         }
     }
 
@@ -905,7 +907,6 @@ public:
             current_animation = it->second.get();
             current_animation->play();
             auto sprite = current_animation->frames[current_animation->current_frame];
-            origin = {sprite.width / 2.0f, sprite.height / 2.0f};
         }
     }
 

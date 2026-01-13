@@ -366,7 +366,7 @@ public:
      *
      * @param world The Box2D world.
      */
-    void debug_draw(b2WorldId world)
+    void draw_debug(b2WorldId world)
     {
         b2World_Draw(world, &dd);
     }
