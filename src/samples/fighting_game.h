@@ -7,8 +7,19 @@ class FightingCharacter : public Character
 public:
     AnimationController* animation;
     int player_number = 1;
+    float width = 24.0f;
+    float height = 40.0f;
+    bool fall_through = false;
+    float fall_through_timer = 0.0f;
+    float fall_through_duration = 0.2f;
 
-    FightingCharacter(CharacterParams p, int player_number = 1) : Character(p), player_number(player_number) {}
+    FightingCharacter(CharacterParams p, int player_number = 1) :
+        Character(p, player_number - 1),
+        player_number(player_number),
+        width(p.width),
+        height(p.height)
+    {
+    }
 
     void init() override
     {
@@ -36,6 +47,77 @@ public:
 
             animation->origin.y += 4;
         }
+        else if (player_number == 2)
+        {
+            animation->add_animation("run",
+                                     std::vector<std::string>{"assets/sunnyland/bunny/run-1.png",
+                                                              "assets/sunnyland/bunny/run-2.png",
+                                                              "assets/sunnyland/bunny/run-3.png",
+                                                              "assets/sunnyland/bunny/run-4.png",
+                                                              "assets/sunnyland/bunny/run-5.png",
+                                                              "assets/sunnyland/bunny/run-6.png"},
+                                     10.0f);
+            animation->add_animation("idle",
+                                     std::vector<std::string>{"assets/sunnyland/bunny/idle-1.png",
+                                                              "assets/sunnyland/bunny/idle-2.png",
+                                                              "assets/sunnyland/bunny/idle-3.png",
+                                                              "assets/sunnyland/bunny/idle-4.png"},
+                                     10.0f);
+            animation->add_animation("jump", std::vector<std::string>{"assets/sunnyland/bunny/jump-1.png"}, 0.0f);
+            animation->add_animation("fall", std::vector<std::string>{"assets/sunnyland/bunny/jump-2.png"}, 0.0f);
+
+            animation->origin.y += 8;
+        }
+        else if (player_number == 3)
+        {
+            animation->add_animation("run",
+                                     std::vector<std::string>{"assets/sunnyland/squirrel/run-1.png",
+                                                              "assets/sunnyland/squirrel/run-2.png",
+                                                              "assets/sunnyland/squirrel/run-3.png",
+                                                              "assets/sunnyland/squirrel/run-4.png",
+                                                              "assets/sunnyland/squirrel/run-5.png",
+                                                              "assets/sunnyland/squirrel/run-6.png"},
+                                     10.0f);
+            animation->add_animation("idle",
+                                     std::vector<std::string>{"assets/sunnyland/squirrel/idle-1.png",
+                                                              "assets/sunnyland/squirrel/idle-2.png",
+                                                              "assets/sunnyland/squirrel/idle-3.png",
+                                                              "assets/sunnyland/squirrel/idle-4.png",
+                                                              "assets/sunnyland/squirrel/idle-5.png",
+                                                              "assets/sunnyland/squirrel/idle-6.png",
+                                                              "assets/sunnyland/squirrel/idle-7.png",
+                                                              "assets/sunnyland/squirrel/idle-8.png"},
+                                     8.0f);
+            animation->add_animation("jump",
+                                     std::vector<std::string>{"assets/sunnyland/squirrel/jump-1.png",
+                                                              "assets/sunnyland/squirrel/jump-2.png",
+                                                              "assets/sunnyland/squirrel/jump-3.png",
+                                                              "assets/sunnyland/squirrel/jump-4.png"},
+                                     15.0f);
+            animation->origin.y += 7;
+        }
+        else if (player_number == 4)
+        {
+            animation->add_animation("run",
+                                     std::vector<std::string>{"assets/sunnyland/imp/run-1.png",
+                                                              "assets/sunnyland/imp/run-2.png",
+                                                              "assets/sunnyland/imp/run-3.png",
+                                                              "assets/sunnyland/imp/run-4.png",
+                                                              "assets/sunnyland/imp/run-5.png",
+                                                              "assets/sunnyland/imp/run-6.png",
+                                                              "assets/sunnyland/imp/run-7.png",
+                                                              "assets/sunnyland/imp/run-8.png"},
+                                     10.0f);
+            animation->add_animation("idle",
+                                     std::vector<std::string>{"assets/sunnyland/imp/idle-1.png",
+                                                              "assets/sunnyland/imp/idle-2.png",
+                                                              "assets/sunnyland/imp/idle-3.png",
+                                                              "assets/sunnyland/imp/idle-4.png"},
+                                     10.0f);
+            animation->add_animation("jump", std::vector<std::string>{"assets/sunnyland/imp/jump-1.png"}, 0.0f);
+            animation->add_animation("fall", std::vector<std::string>{"assets/sunnyland/imp/jump-4.png"}, 0.0f);
+            animation->origin.y += 10;
+        }
     }
 
     void update(float delta_time) override
@@ -54,74 +136,96 @@ public:
 
         if (!movement->grounded)
         {
-            if (body->get_velocity_meters().y < 0.0f)
+            // Squirrel doesn't have a fall animation so we do this monstrosity.
+            if (player_number != 3)
             {
-                animation->play("jump");
+                if (body->get_velocity_meters().y < 0.0f)
+                {
+                    animation->play("jump");
+                }
+                else
+                {
+
+                    animation->play("fall");
+                }
             }
             else
             {
-                animation->play("fall");
+                animation->play("jump");
+            }
+        }
+
+        if (IsKeyPressed(KEY_S) || IsGamepadButtonPressed(gamepad, GAMEPAD_BUTTON_LEFT_FACE_DOWN))
+        {
+            fall_through = true;
+            fall_through_timer = fall_through_duration;
+        }
+
+        if (fall_through_timer > 0.0f)
+        {
+            fall_through_timer = std::max(0.0f, fall_through_timer - delta_time);
+            if (fall_through_timer == 0.0f)
+            {
+                fall_through = false;
+            }
+        }
+
+        if (IsKeyPressed(KEY_SPACE) || IsGamepadButtonPressed(gamepad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))
+        {
+            Vector2 position = body->get_position_pixels();
+            position.x += (width / 2.0f + 8.0f) * (animation->flip_x ? -1.0f : 1.0f);
+            auto bodies = physics->circle_overlap(position, 8.0f, body->id);
+            for (auto& other_body : bodies)
+            {
+                // Apply impulse to other character.
+                b2Vec2 impulse = b2Vec2{animation->flip_x ? -10.0f : 10.0f, -10.0f};
+                b2Body_ApplyLinearImpulse(other_body, impulse, b2Body_GetPosition(other_body), true);
             }
         }
     }
 
     void draw() override
     {
+        // Vector2 position = body->get_position_pixels();
+        // position.x += (width / 2.0f + 8.0f) * (animation->flip_x ? -1.0f : 1.0f);
+        // DrawCircleV(position, 8.0f, Fade(RED, 0.5f));
         // Character is drawn by the AnimationController.
     }
-};
 
-class OneWayPlatform : public GameObject
-{
-public:
-    BodyComponent* body;
-    Vector2 position;
-    Vector2 size;
-
-    OneWayPlatform(Vector2 position, Vector2 size) : position(position), size(size) {}
-
-    void init() override
-    {
-        auto physics = scene->get_service<PhysicsService>();
-
-        b2BodyDef body_def = b2DefaultBodyDef();
-        body_def.type = b2_staticBody;
-        body_def.position = physics->convert_to_meters(position);
-        auto body_id = b2CreateBody(physics->world, &body_def);
-
-        b2Polygon body_polygon =
-            b2MakeBox(physics->convert_to_meters(size.x / 2.0f), physics->convert_to_meters(size.y / 2.0f));
-        b2ShapeDef box_shape_def = b2DefaultShapeDef();
-
-        // Needed to presolve one-way behavior.
-        box_shape_def.enablePreSolveEvents = true;
-
-        b2CreatePolygonShape(body_id, &box_shape_def, &body_polygon);
-
-        body = add_component<BodyComponent>(body_id);
-    }
-
-    void draw() override
-    {
-        // Draw nothing.
-    }
-
-    bool PreSolve(b2BodyId body_a, b2BodyId body_b, b2Manifold* manifold) const
+    bool PreSolve(b2BodyId body_a,
+                  b2BodyId body_b,
+                  b2Manifold* manifold,
+                  std::vector<std::shared_ptr<StaticBox>> platforms) const
     {
         float sign = 0.0f;
+        b2BodyId other = b2_nullBodyId;
         if (body_a == body->id)
         {
-            sign = -1.0f;
+            sign = 1.0f;
+            other = body_b;
         }
         else if (body_b == body->id)
         {
-            sign = 1.0f;
+            sign = -1.0f;
+            other = body_a;
         }
 
         if (sign * manifold->normal.y < 0.5f)
         {
             // Normal points down, disable contact.
             return false;
+        }
+
+        if (fall_through)
+        {
+            for (auto& platform : platforms)
+            {
+                if (other == platform->body)
+                {
+                    // Character is in fall-through state, disable contact.
+                    return false;
+                }
+            }
         }
 
         // Otherwise, enable contact.
@@ -137,8 +241,11 @@ class FightingScene : public Scene
 public:
     RenderTexture2D renderer;
     Rectangle render_rect;
-    std::vector<std::shared_ptr<OneWayPlatform>> platforms;
+    std::vector<std::shared_ptr<StaticBox>> platforms;
+    std::vector<std::shared_ptr<FightingCharacter>> characters;
     LevelService* level;
+    PhysicsService* physics;
+    std::shared_ptr<CameraObject> camera;
 
     void init_services() override
     {
@@ -153,33 +260,37 @@ public:
     {
         auto window_manager = get_manager<WindowManager>();
 
-        auto player_entity = level->get_entities_by_name("Start")[2];
-        if (!player_entity)
-        {
-            assert(false);
-        }
-
         auto platform_entities = level->get_entities_by_name("One_way_platform");
         for (auto& platform_entity : platform_entities)
         {
             Vector2 position = level->convert_to_pixels(platform_entity->getPosition());
             Vector2 size = level->convert_to_pixels(platform_entity->getSize());
-            auto platform = add_game_object<OneWayPlatform>(position + size / 2.0f, size);
+            auto platform = add_game_object<StaticBox>(position + size / 2.0f, size);
+            platform->is_visible = false;
             platform->add_tag("platform");
             platforms.push_back(platform);
         }
 
-        b2World_SetPreSolveCallback(get_service<PhysicsService>()->world, PreSolveStatic, this);
+        physics = get_service<PhysicsService>();
 
-        CharacterParams params;
-        params.position = level->convert_to_pixels(player_entity->getPosition());
-        params.width = 16;
-        params.height = 24;
-        auto character = add_game_object<FightingCharacter>(params);
-        character->add_tag("character");
+        // Pre-solve callback to handle one-way platforms.
+        b2World_SetPreSolveCallback(physics->world, PreSolveStatic, this);
 
-        auto camera = add_game_object<CameraObject>(level->get_size());
-        camera->add_tag("camera");
+        auto player_entities = level->get_entities_by_name("Start");
+
+        for (int i = 0; i < player_entities.size() && i < 4; i++)
+        {
+            auto& player_entity = player_entities[i];
+            CharacterParams params;
+            params.position = level->convert_to_pixels(player_entity->getPosition());
+            params.width = 16;
+            params.height = 24;
+            auto character = add_game_object<FightingCharacter>(params, i + 1);
+            character->add_tag("character");
+            characters.push_back(character);
+        }
+
+        camera = add_game_object<CameraObject>(level->get_size(), Vector2{0, 0}, Vector2{200, 200}, 0, 0, 0, 0);
 
         // Disable the background layer from drawing.
         level->set_layer_visibility("Background", false);
@@ -194,17 +305,34 @@ public:
 
     void update(float delta_time) override
     {
-        auto camera = static_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
-        auto player = static_cast<FightingCharacter*>(get_game_objects_with_tag("character")[0]);
-        auto physics = get_service<PhysicsService>();
-        camera->target = player->body->get_position_pixels();
+        // Set the camera target to the center of all players.
+        // Also zoom to fit all players.
+        Vector2 avg_position = {0.0f, 0.0f};
+        Vector2 min_point = {FLT_MAX, FLT_MAX};
+        Vector2 max_point = {FLT_MIN, FLT_MIN};
+        for (auto& character : characters)
+        {
+            Vector2 char_pos = character->body->get_position_pixels();
+            avg_position = avg_position + char_pos;
+            min_point.x = std::min(min_point.x, char_pos.x);
+            min_point.y = std::min(min_point.y, char_pos.y);
+            max_point.x = std::max(max_point.x, char_pos.x);
+            max_point.y = std::max(max_point.y, char_pos.y);
+        }
+        avg_position = avg_position / static_cast<float>(characters.size());
+        camera->target = avg_position;
+
+        float distance = sqrtf((max_point.x - min_point.x) * (max_point.x - min_point.x) +
+                               (max_point.y - min_point.y) * (max_point.y - min_point.y));
+        float level_diagonal =
+            sqrtf(level->get_size().x * level->get_size().x + level->get_size().y * level->get_size().y);
+        float zoom = level_diagonal / (distance + 400);
+        zoom = std::clamp(zoom, 0.5f, 2.0f);
+        camera->camera.zoom = zoom;
     }
 
     void draw_scene() override
     {
-        auto camera = static_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
-        auto physics = get_service<PhysicsService>();
-
         BeginTextureMode(renderer);
         ClearBackground(MAGENTA);
 
@@ -234,11 +362,11 @@ public:
         FightingScene* self = static_cast<FightingScene*>(context);
         b2BodyId body_a = b2Shape_GetBody(shape_a);
         b2BodyId body_b = b2Shape_GetBody(shape_b);
-        for (auto& platform : self->platforms)
+        for (auto& character : self->characters)
         {
-            if (body_a == platform->body->id || body_b == platform->body->id)
+            if (body_a == character->body->id || body_b == character->body->id)
             {
-                return platform->PreSolve(body_a, body_b, manifold);
+                return character->PreSolve(body_a, body_b, manifold, self->platforms);
             }
         }
         return true;

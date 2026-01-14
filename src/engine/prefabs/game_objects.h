@@ -12,6 +12,7 @@ class StaticBox : public GameObject
 public:
     b2BodyId body = b2_nullBodyId;
     float x, y, width, height;
+    bool is_visible = true;
 
     /**
      * Constructor for StaticBox.
@@ -22,6 +23,14 @@ public:
      * @param height The height of the box in pixels.
      */
     StaticBox(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
+
+    /**
+     * Constructor for StaticBox that takes Vector2s.
+     *
+     * @param position The center of the box in pixels.
+     * @param size The size of the box in pixels.
+     */
+    StaticBox(Vector2 position, Vector2 size) : x(position.x), y(position.y), width(size.x), height(size.y) {}
 
     /**
      * Initialize the StaticBox.
@@ -49,7 +58,10 @@ public:
      */
     void draw() override
     {
-        DrawRectangle(x - width / 2.0f, y - height / 2.0f, width, height, BLUE);
+        if (is_visible)
+        {
+            DrawRectangle(x - width / 2.0f, y - height / 2.0f, width, height, BLUE);
+        }
     }
 };
 
@@ -505,13 +517,14 @@ public:
     bool on_wall_right = false;
     float coyote_timer = 0.0f;
     float jump_buffer_timer = 0.0f;
+    int gamepad = 0;
 
     /**
      * Constructor for Character.
      *
      * @param p The parameters for the character.
      */
-    Character(CharacterParams p) : p(p) {}
+    Character(CharacterParams p, int gamepad = 0) : p(p), gamepad(gamepad) {}
 
     /**
      * Initialize the Character.
@@ -530,6 +543,7 @@ public:
                 body_def.linearDamping = 0.0f;
                 body_def.angularDamping = 0.0f;
                 body_def.position = physics->convert_to_meters(p.position);
+                body_def.userData = this;
                 b.id = b2CreateBody(physics->world, &body_def);
 
                 b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
@@ -539,6 +553,9 @@ public:
                 b2ShapeDef box_shape_def = b2DefaultShapeDef();
                 box_shape_def.density = p.density;
                 box_shape_def.material = body_material;
+
+                // Needed to presolve one-way behavior.
+                box_shape_def.enablePreSolveEvents = true;
 
                 b2Polygon body_polygon = b2MakeRoundedBox(physics->convert_to_meters(p.width / 2.0f),
                                                           physics->convert_to_meters(p.height / 2.0f),
@@ -557,7 +574,6 @@ public:
      */
     void update(float delta_time) override
     {
-        int gamepad = 0;
         float deadzone = 0.1f;
 
         const bool jump_pressed =
