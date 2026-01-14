@@ -338,7 +338,8 @@ public:
             sqrtf(level->get_size().x * level->get_size().x + level->get_size().y * level->get_size().y);
         float zoom = level_diagonal / (distance + 400);
         zoom = std::clamp(zoom, 0.5f, 2.0f);
-        camera->camera.zoom = zoom;
+        // Lerp zoom for smoothness.
+        camera->camera.zoom += (zoom - camera->camera.zoom) * std::min(1.0f, delta_time * 5.0f);
     }
 
     void draw_scene() override
