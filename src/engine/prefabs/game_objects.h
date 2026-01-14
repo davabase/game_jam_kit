@@ -39,8 +39,6 @@ public:
 
         b2Polygon body_polygon = b2MakeBox(width / 2.0f * pixels_to_meters, height / 2.0f * pixels_to_meters);
         b2ShapeDef box_shape_def = b2DefaultShapeDef();
-        // Needed for one-way platforms.
-        box_shape_def.enablePreSolveEvents = true;
         b2CreatePolygonShape(body, &box_shape_def, &body_polygon);
 
         add_component<BodyComponent>(body);
@@ -183,10 +181,10 @@ public:
     CameraObject(Vector2 size,
                  Vector2 level_size = {0, 0},
                  Vector2 follow_speed = {1000, 1000},
-                 float offset_left = 50,
-                 float offset_right = 50,
-                 float offset_top = 35,
-                 float offset_bottom = 35) :
+                 float offset_left = 70,
+                 float offset_right = 70,
+                 float offset_top = 40,
+                 float offset_bottom = 40) :
         size(size),
         level_size(level_size),
         follow_speed(follow_speed),

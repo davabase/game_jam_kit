@@ -71,27 +71,34 @@ public:
     }
 };
 
-class OneWayPlatform : public StaticBox
+class OneWayPlatform : public GameObject
 {
 public:
     BodyComponent* body;
+    Vector2 position;
+    Vector2 size;
 
-    OneWayPlatform(Vector2 position, Vector2 size) : StaticBox(position.x, position.y, size.x, size.y) {}
+    OneWayPlatform(Vector2 position, Vector2 size) : position(position), size(size) {}
 
     void init() override
     {
-        StaticBox::init();
-        body = get_component<BodyComponent>();
+        auto physics = scene->get_service<PhysicsService>();
 
-        // Enable pre-solve events so the callback gets called
-        b2BodyId bodyId = body->id;
-        int shapeCount = b2Body_GetShapeCount(bodyId);
-        b2ShapeId shapes[8];
-        b2Body_GetShapes(bodyId, shapes, shapeCount);
-        for (int i = 0; i < shapeCount; i++)
-        {
-            b2Shape_EnablePreSolveEvents(shapes[i], true);
-        }
+        b2BodyDef body_def = b2DefaultBodyDef();
+        body_def.type = b2_staticBody;
+        body_def.position = physics->convert_to_meters(position);
+        auto body_id = b2CreateBody(physics->world, &body_def);
+
+        b2Polygon body_polygon =
+            b2MakeBox(physics->convert_to_meters(size.x / 2.0f), physics->convert_to_meters(size.y / 2.0f));
+        b2ShapeDef box_shape_def = b2DefaultShapeDef();
+
+        // Needed to presolve one-way behavior.
+        box_shape_def.enablePreSolveEvents = true;
+
+        b2CreatePolygonShape(body_id, &box_shape_def, &body_polygon);
+
+        body = add_component<BodyComponent>(body_id);
     }
 
     void draw() override
@@ -111,7 +118,7 @@ public:
             sign = 1.0f;
         }
 
-        if (sign * manifold->normal.y < 0.0f)
+        if (sign * manifold->normal.y < 0.5f)
         {
             // Normal points down, disable contact.
             return false;
@@ -131,6 +138,7 @@ public:
     RenderTexture2D renderer;
     Rectangle render_rect;
     std::vector<std::shared_ptr<OneWayPlatform>> platforms;
+    LevelService* level;
 
     void init_services() override
     {
@@ -138,14 +146,13 @@ public:
         add_service<SoundService>();
         add_service<PhysicsService>();
         std::vector<std::string> collision_names = {"walls"};
-        add_service<LevelService>("assets/levels/fighting.ldtk", "Stage", collision_names);
+        level = add_service<LevelService>("assets/levels/fighting.ldtk", "Stage", collision_names);
     }
 
     void init() override
     {
         auto window_manager = get_manager<WindowManager>();
 
-        auto level = get_service<LevelService>();
         auto player_entity = level->get_entities_by_name("Start")[2];
         if (!player_entity)
         {
@@ -174,6 +181,9 @@ public:
         auto camera = add_game_object<CameraObject>(level->get_size());
         camera->add_tag("camera");
 
+        // Disable the background layer from drawing.
+        level->set_layer_visibility("Background", false);
+
         renderer = LoadRenderTexture(level->get_size().x, level->get_size().y);
         float aspect_ratio = level->get_size().x / level->get_size().y;
         float render_scale = window_manager->get_height() / level->get_size().y;
@@ -187,7 +197,7 @@ public:
         auto camera = static_cast<CameraObject*>(get_game_objects_with_tag("camera")[0]);
         auto player = static_cast<FightingCharacter*>(get_game_objects_with_tag("character")[0]);
         auto physics = get_service<PhysicsService>();
-        // camera->target = player->body->get_position_pixels();
+        camera->target = player->body->get_position_pixels();
     }
 
     void draw_scene() override
@@ -197,11 +207,16 @@ public:
 
         BeginTextureMode(renderer);
         ClearBackground(MAGENTA);
-        // camera->draw_begin();
+
+        // Draw the background layer outside of the camera.
+        level->draw_layer("Background");
+
+        camera->draw_begin();
         Scene::draw_scene();
         physics->draw_debug();
-        // camera->draw_debug();
-        // camera->draw_end();
+        camera->draw_debug();
+        camera->draw_end();
+
         EndTextureMode();
 
         // Draw centered.

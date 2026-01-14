@@ -267,6 +267,7 @@ class Service
 public:
     Scene* scene = nullptr;
     bool is_init = false;
+    bool is_visible = true;
 
     Service() = default;
     virtual ~Service() = default;
@@ -285,9 +286,19 @@ public:
 
     /**
      * Lifecycle function called every frame to draw the service.
-     * Called within Raylib BeginDrawing()/EndDrawing() block.
      */
     virtual void draw() {}
+
+    /**
+     * Lifecycle function called every frame to draw the service.
+     * Called within Raylib BeginDrawing()/EndDrawing() block.
+     */
+    virtual void draw_service() {
+        if (is_visible)
+        {
+            draw();
+        }
+    }
 
     /**
      * Initialize the service.

@@ -50,7 +50,6 @@ public:
         {
             service.second->draw();
         }
-        Service::draw();
     }
 
     /**
@@ -396,6 +395,13 @@ struct EdgeHash
     }
 };
 
+struct LayerRenderer
+{
+    RenderTexture2D renderer;
+    ldtk::IID layer_iid;
+    bool visible = true;
+};
+
 /**
  * Service for managing LDtk levels.
  * Depends on TextureService and PhysicsService.
@@ -407,7 +413,7 @@ public:
     std::string project_file;
     std::string level_name;
     std::vector<std::string> collision_names;
-    std::vector<RenderTexture2D> renderers;
+    std::vector<LayerRenderer> renderers;
     std::vector<b2BodyId> layer_bodies;
     float scale = 1.0f;
     PhysicsService* physics;
@@ -435,7 +441,7 @@ public:
     {
         for (auto& renderer : renderers)
         {
-            UnloadRenderTexture(renderer);
+            UnloadRenderTexture(renderer.renderer);
         }
 
         for (auto& body : layer_bodies)
@@ -519,7 +525,10 @@ public:
                 DrawTextureRec(texture, src, dest, WHITE);
             }
             EndTextureMode();
-            renderers.push_back(renderer);
+            LayerRenderer layer_renderer;
+            layer_renderer.renderer = renderer;
+            layer_renderer.layer_iid = layer.iid;
+            renderers.push_back(layer_renderer);
 
             // Create bodies.
             const auto& size = layer.getGridSize();
@@ -711,7 +720,12 @@ public:
         // Draw renderers in reverse.
         for (int i = (int)renderers.size() - 1; i >= 0; i--)
         {
-            const auto& renderer = renderers[i];
+            const auto& layer_renderer = renderers[i];
+            if (!layer_renderer.visible)
+            {
+                continue;
+            }
+            const auto& renderer = layer_renderer.renderer;
             Rectangle src = {0,
                              0,
                              static_cast<float>(renderer.texture.width),
@@ -722,6 +736,44 @@ public:
                               static_cast<float>(renderer.texture.height) * scale};
             DrawTexturePro(renderer.texture, src, dest, {0}, .0f, WHITE);
         }
+    }
+
+    /**
+     * Draw a specific layer by its IID.
+     *
+     * @param layer_id The IID of the layer.
+     */
+    void draw_layer(ldtk::IID layer_id)
+    {
+        for (const auto& layer_renderer : renderers)
+        {
+            if (layer_renderer.layer_iid == layer_id)
+            {
+                const auto& renderer = layer_renderer.renderer;
+                Rectangle src = {0,
+                                 0,
+                                 static_cast<float>(renderer.texture.width),
+                                 -static_cast<float>(renderer.texture.height)};
+                Rectangle dest = {0,
+                                  0,
+                                  static_cast<float>(renderer.texture.width) * scale,
+                                  static_cast<float>(renderer.texture.height) * scale};
+                DrawTexturePro(renderer.texture, src, dest, {0}, .0f, WHITE);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Draw a specific layer by its name.
+     *
+     * @param layer_name The name of the layer.
+     */
+    void draw_layer(std::string layer_name)
+    {
+        const auto& level = get_level();
+        const auto& layer = level.getLayer(layer_name);
+        draw_layer(layer.iid);
     }
 
     /**
@@ -812,11 +864,59 @@ public:
         return false;
     }
 
+    /**
+     * Set the visibility of a layer by its IID.
+     *
+     * @param layer_id The IID of the layer.
+     * @param visible True to make the layer visible, false to hide it.
+     */
+    void set_layer_visibility(ldtk::IID layer_id, bool visible)
+    {
+        for (auto& layer_renderer : renderers)
+        {
+            if (layer_renderer.layer_iid == layer_id)
+            {
+                layer_renderer.visible = visible;
+                return;
+            }
+        }
+    }
+
+    /**
+     * Set the visibility of a layer by its name.
+     *
+     * @param layer_name The name of the layer.
+     * @param visible True to make the layer visible, false to hide it.
+     */
+    void set_layer_visibility(std::string layer_name, bool visible)
+    {
+        const auto& level = get_level();
+        const auto& layer = level.getLayer(layer_name);
+        for (auto& layer_renderer : renderers)
+        {
+            if (layer_renderer.layer_iid == layer.iid)
+            {
+                layer_renderer.visible = visible;
+                return;
+            }
+        }
+    }
+
+    /**
+     * Get the LDtk world.
+     *
+     * @return A reference to the LDtk world.
+     */
     const ldtk::World& get_world()
     {
         return project.getWorld();
     }
 
+    /**
+     * Get the LDtk level.
+     *
+     * @return A reference to the LDtk level.
+     */
     const ldtk::Level& get_level()
     {
         const auto& world = project.getWorld();
