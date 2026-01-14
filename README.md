@@ -1,4 +1,12 @@
-# A multiplayer experience.
+# Game Jam Kit
+
+## Linux prerequisites
+Install `xmake`, `cmake`, and opengl libs:
+```bash
+sudo apt-get install xmake
+sudo apt-get install cmake
+sudo apt-get install libgl1-mesa-dev
+```
 
 ## Build
 ```bash

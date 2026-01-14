@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <typeindex>
@@ -293,7 +294,8 @@ public:
      * Lifecycle function called every frame to draw the service.
      * Called within Raylib BeginDrawing()/EndDrawing() block.
      */
-    virtual void draw_service() {
+    virtual void draw_service()
+    {
         if (is_visible)
         {
             draw();
@@ -550,7 +552,7 @@ public:
         {
             TraceLog(LOG_FATAL, "No Game assigned to scene.");
         }
-        return game->get_manager<T>();
+        return game->template get_manager<T>();
     }
 
     /**
@@ -780,45 +782,6 @@ public:
                 {
                     // Loop back to the first scene.
                     next_scene = scenes[scene_order[0]].get();
-                }
-            }
-        }
-        return next_scene;
-    }
-
-    /**
-     * Transition to the previous scene in the scene order.
-     * Loops back to the last scene if at the beginning.
-     *
-     * @return A pointer to the previous scene.
-     */
-    Scene* go_to_scene_previous()
-    {
-        // Find the previous scene.
-        if (current_scene)
-        {
-            auto it = scenes.end();
-            while (it != scenes.begin())
-            {
-                --it;
-                if (it->second.get() == current_scene)
-                {
-                    break;
-                }
-            }
-            if (it != scenes.begin())
-            {
-                std::string name = it->first;
-                auto order_it = std::find(scene_order.begin(), scene_order.end(), name);
-                if (order_it != scene_order.end() && order_it != scene_order.begin())
-                {
-                    std::string prev_name = *(std::prev(order_it));
-                    next_scene = scenes[prev_name].get();
-                }
-                else
-                {
-                    // Loop back to the last scene.
-                    next_scene = scenes[scene_order.back()].get();
                 }
             }
         }

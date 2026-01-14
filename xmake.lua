@@ -11,6 +11,7 @@ add_requires("raylib", "box2d", "ldtkloader")
 target("game_jam_kit")
     set_kind("binary")
     add_files("src/*.cpp")
+    add_includedirs("src", { public = true })
     add_packages("raylib", "box2d", "ldtkloader")
 
     after_build(function (target)
