@@ -367,6 +367,27 @@ public:
     }
 
     /**
+     * Set the position of the body in meters.
+     *
+     * @param meters The position in meters.
+     */
+    void set_position(b2Vec2 meters)
+    {
+        b2Rot rotation = b2Body_GetRotation(id);
+        b2Body_SetTransform(id, meters, rotation);
+    }
+
+    /**
+     * Set the position of the body in pixels.
+     *
+     * @param pixels The position in pixels.
+     */
+    void set_position(Vector2 pixels)
+    {
+        set_position(physics->convert_to_meters(pixels));
+    }
+
+    /**
      * Get the velocity of the body in meters per second.
      *
      * @return The velocity in meters per second.

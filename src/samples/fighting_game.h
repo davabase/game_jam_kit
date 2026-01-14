@@ -12,6 +12,7 @@ public:
     bool fall_through = false;
     float fall_through_timer = 0.0f;
     float fall_through_duration = 0.2f;
+    LevelService* level = nullptr;
 
     FightingCharacter(CharacterParams p, int player_number = 1) :
         Character(p, player_number - 1),
@@ -24,6 +25,8 @@ public:
     void init() override
     {
         Character::init();
+
+        level = scene->get_service<LevelService>();
 
         animation = add_component<AnimationController>(body);
         if (player_number == 1)
@@ -182,6 +185,13 @@ public:
                 b2Body_ApplyLinearImpulse(other_body, impulse, b2Body_GetPosition(other_body), true);
             }
         }
+
+        if (body->get_position_pixels().y > level->get_size().y + 200.0f)
+        {
+            // Re-spawn at start position.
+            body->set_position(p.position);
+            body->set_velocity(Vector2{0.0f, 0.0f});
+        }
     }
 
     void draw() override
@@ -290,7 +300,7 @@ public:
             characters.push_back(character);
         }
 
-        camera = add_game_object<CameraObject>(level->get_size(), Vector2{0, 0}, Vector2{200, 200}, 0, 0, 0, 0);
+        camera = add_game_object<CameraObject>(level->get_size(), Vector2{0, 0}, Vector2{300, 300}, 0, 0, 0, 0);
 
         // Disable the background layer from drawing.
         level->set_layer_visibility("Background", false);
@@ -341,8 +351,8 @@ public:
 
         camera->draw_begin();
         Scene::draw_scene();
-        physics->draw_debug();
-        camera->draw_debug();
+        // physics->draw_debug();
+        // camera->draw_debug();
         camera->draw_end();
 
         EndTextureMode();
