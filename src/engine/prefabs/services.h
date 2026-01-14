@@ -207,11 +207,6 @@ public:
         meters_to_pixels(meters_to_pixels),
         pixels_to_meters(1.0f / meters_to_pixels)
     {
-        // Lazy fix, but other services need world before init.
-        b2WorldDef world_def = b2DefaultWorldDef();
-        world_def.gravity = gravity;
-        world_def.contactHertz = 120;
-        world = b2CreateWorld(&world_def);
     }
 
     ~PhysicsService()
@@ -227,6 +222,10 @@ public:
      */
     void init() override
     {
+        b2WorldDef world_def = b2DefaultWorldDef();
+        world_def.gravity = gravity;
+        world_def.contactHertz = 120;
+        world = b2CreateWorld(&world_def);
         debug_draw.init(meters_to_pixels);
     }
 

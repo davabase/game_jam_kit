@@ -355,7 +355,7 @@ class Scene
 {
 public:
     std::vector<std::shared_ptr<GameObject>> game_objects;
-    std::unordered_map<std::type_index, std::unique_ptr<Service>> services;
+    std::vector<std::tuple<std::type_index, std::unique_ptr<Service>>> services;
     Game* game = nullptr;
     bool is_init = false;
 
@@ -399,7 +399,7 @@ public:
 
         for (auto& service : services)
         {
-            service.second->init_service();
+            std::get<1>(service)->init_service();
         }
 
         init();
@@ -423,7 +423,7 @@ public:
 
         for (auto& service : services)
         {
-            service.second->update(delta_time);
+            std::get<1>(service)->update(delta_time);
         }
         for (auto& game_object : game_objects)
         {
@@ -441,7 +441,7 @@ public:
 
         for (auto& service : services)
         {
-            service.second->draw();
+            std::get<1>(service)->draw();
         }
         for (auto& game_object : game_objects)
         {
@@ -495,11 +495,16 @@ public:
     {
         static_assert(std::is_base_of<Service, T>::value, "T must derive from Service");
         service->scene = this;
-        auto [it, inserted] = services.emplace(std::type_index(typeid(T)), std::move(service));
-        if (!inserted)
+        // Check if service of this type already exists.
+        for (auto& svc : services)
         {
-            TraceLog(LOG_ERROR, "Duplicate service added: %s", typeid(T).name());
+            if (std::get<0>(svc) == std::type_index(typeid(T)))
+            {
+                TraceLog(LOG_ERROR, "Duplicate service added: %s", typeid(T).name());
+                return;
+            }
         }
+        services.emplace_back(std::type_index(typeid(T)), std::move(service));
     }
 
     /**
@@ -526,15 +531,17 @@ public:
     template <typename T>
     T* get_service()
     {
-        auto it = services.find(std::type_index(typeid(T)));
-        if (it != services.end())
+        for (auto& service : services)
         {
-            auto service = it->second.get();
-            if (!service->is_init)
+            if (std::get<0>(service) == std::type_index(typeid(T)))
             {
-                TraceLog(LOG_ERROR, "Service not initialized: %s", typeid(T).name());
+                auto svc = std::get<1>(service).get();
+                if (!svc->is_init)
+                {
+                    TraceLog(LOG_ERROR, "Service not initialized: %s", typeid(T).name());
+                }
+                return static_cast<T*>(svc);
             }
-            return static_cast<T*>(service);
         }
         TraceLog(LOG_FATAL, "Service of requested type not found in scene: %s", typeid(T).name());
         return nullptr;

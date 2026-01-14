@@ -301,6 +301,7 @@ public:
         }
 
         camera = add_game_object<CameraObject>(level->get_size(), Vector2{0, 0}, Vector2{300, 300}, 0, 0, 0, 0);
+        camera->target = level->get_size() / 2.0f;
 
         // Disable the background layer from drawing.
         level->set_layer_visibility("Background", false);
