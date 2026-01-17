@@ -60,7 +60,7 @@ public:
     {
         if (is_visible)
         {
-            DrawRectangle(x - width / 2.0f, y - height / 2.0f, width, height, BLUE);
+            DrawRectangle((int)(x - width / 2.0f), (int)(y - height / 2.0f), (int)width, (int)height, BLUE);
         }
     }
 };
@@ -430,7 +430,7 @@ public:
      */
     void init() override
     {
-        texture = LoadRenderTexture(size.x, size.y);
+        texture = LoadRenderTexture((int)size.x, (int)size.y);
         CameraObject::init();
     }
 

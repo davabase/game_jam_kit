@@ -2,6 +2,8 @@ add_rules("mode.debug", "mode.release")
 
 set_languages("c++17")
 
+-- set_warnings("all", "error")
+
 if is_plat("wasm") then
     set_toolchains("emcc")
 end

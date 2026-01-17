@@ -441,13 +441,19 @@ public:
         }
 
         // Setup shared camera.
-        camera = add_game_object<CameraObject>(level->get_size(), Vector2{0, 0}, Vector2{300, 300}, 0, 0, 0, 0);
+        camera = add_game_object<CameraObject>(level->get_size(),
+                                               Vector2{0.0f, 0.0f},
+                                               Vector2{300.0f, 300.0f},
+                                               0.0f,
+                                               0.0f,
+                                               0.0f,
+                                               0.0f);
         camera->target = level->get_size() / 2.0f;
 
         // Disable the background layer from drawing. We'll draw it manually in draw_scene().
         level->set_layer_visibility("Background", false);
 
-        renderer = LoadRenderTexture(level->get_size().x, level->get_size().y);
+        renderer = LoadRenderTexture((int)level->get_size().x, (int)level->get_size().y);
     }
 
     void update(float delta_time) override
