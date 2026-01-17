@@ -710,7 +710,7 @@ public:
                 current_frame = 0;
             else
             {
-                current_frame = frames.size() - 1;
+                current_frame = (int)frames.size() - 1;
             }
         }
     }

@@ -89,7 +89,7 @@ static void DrawSolidPolygon(b2Transform xf, const b2Vec2* v, int count, float r
     auto* ctx = (DebugDrawCtx*)context;
 
     // Fill color with some alpha so you can see overlap.
-    Color fill = ToRaylibColor(color, 0.8);
+    Color fill = ToRaylibColor(color, 0.8f);
     Color line = ToRaylibColor(color);
 
     // Transform to pixels.
@@ -150,7 +150,7 @@ static void DrawCircleOutline(b2Vec2 center, float radius, b2HexColor color, voi
  */
 static void DrawSolidCircle(b2Transform xf, float radius, b2HexColor color, void* context)
 {
-    Color fill = ToRaylibColor(color, 0.8);
+    Color fill = ToRaylibColor(color, 0.8f);
     Color line = ToRaylibColor(color);
 
     auto* ctx = (DebugDrawCtx*)context;
@@ -216,7 +216,7 @@ static void DrawSolidCapsule(b2Vec2 p1, b2Vec2 p2, float radius_m, b2HexColor co
 {
     auto* ctx = (DebugDrawCtx*)context;
 
-    Color fill = ToRaylibColor(color, 0.8);
+    Color fill = ToRaylibColor(color, 0.8f);
     Color line = ToRaylibColor(color);
 
     Vector2 a = {p1.x * ctx->meters_to_pixels, p1.y * ctx->meters_to_pixels};

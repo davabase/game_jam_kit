@@ -705,7 +705,7 @@ public:
                 cd.points = verts.data();
                 cd.count = (int)verts.size();
                 cd.materials = mats.data();
-                cd.materialCount = mats.size();
+                cd.materialCount = (int)mats.size();
                 cd.isLoop = true;
                 b2CreateChain(layer_body, &cd);
 
