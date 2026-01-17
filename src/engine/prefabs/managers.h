@@ -156,6 +156,7 @@ public:
      */
     void init() override
     {
+        SetConfigFlags(FLAG_WINDOW_RESIZABLE);
         InitWindow(width, height, title.c_str());
         InitAudioDevice();
         SetTargetFPS(target_fps);

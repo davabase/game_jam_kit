@@ -143,9 +143,11 @@ public:
     {
         for (auto& pair : sounds)
         {
-            for (auto& sound : pair.second)
+            // The first sound is a real sound.
+            UnloadSound(pair.second[0]);
+            for (int i = 1; i < pair.second.size(); i++)
             {
-                UnloadSound(sound);
+                UnloadSoundAlias(pair.second[i]);
             }
         }
     }

@@ -6,6 +6,7 @@ if is_plat("wasm") then
     set_toolchains("emcc")
 end
 
+-- Packages
 add_requires("raylib", "box2d", "ldtkloader")
 
 target("game_jam_kit")
@@ -14,12 +15,14 @@ target("game_jam_kit")
     add_includedirs("src", { public = true })
     add_packages("raylib", "box2d", "ldtkloader")
 
+    -- Copy assets to output directory after build
     after_build(function (target)
         local outdir = target:targetdir()
         os.mkdir(outdir)
         os.cp("assets", outdir)
     end)
 
+    -- Emscripten / WebAssembly specific settings
     if is_plat("wasm") then
         add_cxxflags("-O3", {force = true})
         add_ldflags(

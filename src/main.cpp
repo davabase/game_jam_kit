@@ -1,5 +1,6 @@
 #include "samples/fighting_game.h"
 
+// Emscripten is used for web builds.
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
@@ -12,6 +13,7 @@ void update()
     game.update(delta_time);
 }
 
+// TODO: Make this a GUI app for each platform.
 int main(int argc, char** argv)
 {
     // Initialize the window
@@ -20,7 +22,7 @@ int main(int argc, char** argv)
     game.init();
 
     // Game::init initializes all managers, so we can load fonts now.
-    font_manager->load_font("Roboto", "assets/Roboto.ttf", 64);
+    font_manager->load_font("Roboto", "assets/fonts/Roboto.ttf", 64);
     font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
     game.add_scene<FightingScene>("fighting");
 

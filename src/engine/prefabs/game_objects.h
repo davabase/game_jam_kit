@@ -483,7 +483,7 @@ public:
 };
 
 /**
- * Parameters for the Character game object.
+ * Parameters for the PlatformerCharacter game object.
  */
 struct CharacterParams
 {
@@ -503,14 +503,13 @@ struct CharacterParams
 /**
  * A simple platformer character with movement and animation.
  */
-class Character : public GameObject
+class PlatformerCharacter : public GameObject
 {
 public:
     CharacterParams p;
     PhysicsService* physics;
     BodyComponent* body;
     MovementComponent* movement;
-    AnimationController* animation;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -520,14 +519,14 @@ public:
     int gamepad = 0;
 
     /**
-     * Constructor for Character.
+     * Constructor for PlatformerCharacter.
      *
      * @param p The parameters for the character.
      */
-    Character(CharacterParams p, int gamepad = 0) : p(p), gamepad(gamepad) {}
+    PlatformerCharacter(CharacterParams p, int gamepad = 0) : p(p), gamepad(gamepad) {}
 
     /**
-     * Initialize the Character.
+     * Initialize the PlatformerCharacter.
      */
     void init() override
     {
@@ -570,7 +569,7 @@ public:
     }
 
     /**
-     * Update the Character.
+     * Update the PlatformerCharacter.
      */
     void update(float delta_time) override
     {
@@ -599,7 +598,7 @@ public:
     }
 
     /**
-     * Draw the Character as a rectangle.
+     * Draw the PlatformerCharacter as a rectangle.
      */
     void draw() override
     {

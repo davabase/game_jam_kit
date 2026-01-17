@@ -31,7 +31,7 @@ public:
 
         CharacterParams params;
         params.position = level->convert_to_pixels(player_entity->getPosition());
-        auto character = add_game_object<Character>(params);
+        auto character = add_game_object<PlatformerCharacter>(params);
         character->add_tag("character");
 
         auto position = level->convert_to_pixels(box_entity->getPosition());
@@ -55,7 +55,7 @@ public:
     {
         auto camera = static_cast<SplitCamera*>(get_game_objects_with_tag("camera")[0]);
         auto camera2 = static_cast<SplitCamera*>(get_game_objects_with_tag("camera")[1]);
-        auto player = static_cast<Character*>(get_game_objects_with_tag("character")[0]);
+        auto player = static_cast<PlatformerCharacter*>(get_game_objects_with_tag("character")[0]);
         auto physics = get_service<PhysicsService>();
         camera->target = player->body->get_position_pixels();
         camera2->target = player->body->get_position_pixels();

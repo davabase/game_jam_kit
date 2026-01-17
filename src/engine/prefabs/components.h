@@ -61,6 +61,7 @@ public:
     {
         static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
         components[name] = std::move(component);
+        components[name]->owner = owner;
     }
 
     /**
