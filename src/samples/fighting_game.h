@@ -456,7 +456,7 @@ public:
         // Also zoom to fit all players.
         Vector2 avg_position = {0.0f, 0.0f};
         Vector2 min_point = {FLT_MAX, FLT_MAX};
-        Vector2 max_point = {FLT_MIN, FLT_MIN};
+        Vector2 max_point = {-FLT_MAX, -FLT_MAX};
         for (auto& character : characters)
         {
             Vector2 char_pos = character->body->get_position_pixels();
@@ -469,13 +469,21 @@ public:
         avg_position = avg_position / static_cast<float>(characters.size());
         camera->target = avg_position;
 
+        // Force camera to align with pixel grid to avoid sub-pixel jitter.
+        camera->target.x = floorf(camera->target.x);
+        camera->target.y = floorf(camera->target.y);
+
+        // Calculate zoom to fit all characters.
         float distance = sqrtf((max_point.x - min_point.x) * (max_point.x - min_point.x) +
                                (max_point.y - min_point.y) * (max_point.y - min_point.y));
         float level_diagonal =
             sqrtf(level->get_size().x * level->get_size().x + level->get_size().y * level->get_size().y);
         float zoom = level_diagonal / (distance + 400);
         zoom = std::clamp(zoom, 0.5f, 2.0f);
+
         // Lerp zoom for smoothness.
+        // Note that this style of camera zoom is incompatible with pixel perfect rendering. Remove this line to see
+        // pixel perfect scaling.
         camera->camera.zoom += (zoom - camera->camera.zoom) * std::min(1.0f, delta_time * 5.0f);
 
         // Draw the level centered in the window.
