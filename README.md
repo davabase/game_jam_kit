@@ -35,6 +35,12 @@ This project uses [xmake](https://xmake.io/) to build. Checkout `xmake.lua` for 
 
 Using the [xmake extension](https://marketplace.visualstudio.com/items?itemName=tboox.xmake-vscode) for VS Code is highly recommended.
 
+## Mac prerequisites
+Install `xmake`:
+```bash
+brew install xmake
+```
+
 ## Linux prerequisites
 Install `xmake`, `cmake`, and opengl libs:
 ```bash

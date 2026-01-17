@@ -408,7 +408,7 @@ public:
 
     void init() override
     {
-        auto window_manager = get_manager<WindowManager>();
+        auto window_manager = game->get_manager<WindowManager>();
 
         // Find one-way platform entities in the level and create StaticBox game objects for them.
         auto platform_entities = level->get_entities_by_name("One_way_platform");
