@@ -33,6 +33,8 @@ See `main.cpp` for how to build a `Game`.
 ## Building
 This project uses [xmake](https://xmake.io/) to build. Checkout `xmake.lua` for more details.
 
+Using the [xmake extension](https://marketplace.visualstudio.com/items?itemName=tboox.xmake-vscode) for VS Code is highly recommended.
+
 ## Linux prerequisites
 Install `xmake`, `cmake`, and opengl libs:
 ```bash
