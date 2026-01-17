@@ -129,7 +129,7 @@ public:
      */
     void init() override
     {
-        font_manager = owner->scene->get_manager<FontManager>();
+        font_manager = owner->scene->game->get_manager<FontManager>();
     }
 
     /**

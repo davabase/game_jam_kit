@@ -291,6 +291,19 @@ public:
     virtual void draw() {}
 
     /**
+     * Initialize the service.
+     */
+    virtual void init_service()
+    {
+        if (is_init)
+        {
+            return;
+        }
+        init();
+        is_init = true;
+    }
+
+    /**
      * Lifecycle function called every frame to draw the service.
      * Called within Raylib BeginDrawing()/EndDrawing() block.
      */
@@ -300,19 +313,6 @@ public:
         {
             draw();
         }
-    }
-
-    /**
-     * Initialize the service.
-     */
-    virtual void init_service() final
-    {
-        if (is_init)
-        {
-            return;
-        }
-        init();
-        is_init = true;
     }
 };
 
@@ -545,21 +545,6 @@ public:
         }
         TraceLog(LOG_FATAL, "Service of requested type not found in scene: %s", typeid(T).name());
         return nullptr;
-    }
-
-    /**
-     * Get a manager of the specified type from the game.
-     *
-     * @return A pointer to the manager.
-     */
-    template <typename T>
-    T* get_manager()
-    {
-        if (!game)
-        {
-            TraceLog(LOG_FATAL, "No Game assigned to scene.");
-        }
-        return game->template get_manager<T>();
     }
 
     /**
