@@ -1,3 +1,4 @@
+#include "samples/collecting_game.h"
 #include "samples/fighting_game.h"
 
 // Emscripten is used for web builds.
@@ -24,6 +25,7 @@ int main(int argc, char** argv)
     // Game::init initializes all managers, so we can load fonts now.
     font_manager->load_font("Roboto", "assets/fonts/Roboto.ttf", 64);
     font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
+    game.add_scene<CollectingScene>("collecting");
     game.add_scene<FightingScene>("fighting");
 
 // Main game loop

@@ -396,7 +396,7 @@ public:
 class SplitCamera : public CameraObject
 {
 public:
-    RenderTexture2D texture;
+    RenderTexture2D renderer;
 
     /**
      * Constructor for SplitCamera.
@@ -412,17 +412,17 @@ public:
     SplitCamera(Vector2 size,
                 Vector2 level_size = {0, 0},
                 Vector2 follow_speed = {1000, 1000},
-                float offset_left = 150,
-                float offset_right = 150,
-                float offset_top = 100,
-                float offset_bottom = 100) :
+                float offset_left = 70,
+                float offset_right = 70,
+                float offset_top = 40,
+                float offset_bottom = 40) :
         CameraObject(size, level_size, follow_speed, offset_left, offset_right, offset_top, offset_bottom)
     {
     }
 
     ~SplitCamera()
     {
-        UnloadRenderTexture(texture);
+        UnloadRenderTexture(renderer);
     }
 
     /**
@@ -430,7 +430,7 @@ public:
      */
     void init() override
     {
-        texture = LoadRenderTexture((int)size.x, (int)size.y);
+        renderer = LoadRenderTexture((int)size.x, (int)size.y);
         CameraObject::init();
     }
 
@@ -440,7 +440,7 @@ public:
      */
     void draw_begin()
     {
-        BeginTextureMode(texture);
+        BeginTextureMode(renderer);
         ClearBackground(WHITE);
         BeginMode2D(camera);
     }
@@ -462,9 +462,19 @@ public:
      */
     void draw_texture(float x, float y)
     {
-        DrawTextureRec(texture.texture,
-                       {0, 0, static_cast<float>(texture.texture.width), static_cast<float>(-texture.texture.height)},
+        DrawTextureRec(renderer.texture,
+                       {0, 0, static_cast<float>(renderer.texture.width), static_cast<float>(-renderer.texture.height)},
                        {x, y},
+                       WHITE);
+    }
+
+    void draw_texture_pro(float x, float y, float width, float height)
+    {
+        DrawTexturePro(renderer.texture,
+                       {0, 0, static_cast<float>(renderer.texture.width), static_cast<float>(-renderer.texture.height)},
+                       {x, y, width, height},
+                       {0, 0},
+                       0.0f,
                        WHITE);
     }
 
