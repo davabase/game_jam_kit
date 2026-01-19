@@ -45,6 +45,7 @@ brew install xmake
 Install `xmake`, `cmake`, and opengl libs:
 ```bash
 sudo apt-get install xmake
+sudo apt-get install g++
 sudo apt-get install cmake
 sudo apt-get install libgl1-mesa-dev
 ```
