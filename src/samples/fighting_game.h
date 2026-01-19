@@ -69,8 +69,6 @@ public:
                 body_def.isBullet = true;
                 // All units in box2d are in meters.
                 body_def.position = physics->convert_to_meters(p.position);
-                // Assign this GameObject as the user data so we can find it in collision callbacks.
-                body_def.userData = this;
                 b.id = b2CreateBody(physics->world, &body_def);
 
                 b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();

@@ -352,6 +352,22 @@ public:
     }
 
     /**
+     * Enable the body in the physics simulation.
+     */
+    void enable()
+    {
+        b2Body_Enable(id);
+    }
+
+    /**
+     * Disable the body in the physics simulation.
+     */
+    void disable()
+    {
+        b2Body_Disable(id);
+    }
+
+    /**
      * Get the position of the body in meters.
      */
     b2Vec2 get_position_meters() const
@@ -447,11 +463,11 @@ public:
      */
     std::vector<b2BodyId> get_contacts()
     {
-        int capacity = b2Body_GetContactCapacity(id);
-        std::vector<b2ContactData> contact_data;
-        contact_data.reserve(capacity);
+        // Choose 10 as an arbitrary max number of contacts on the body.
+        constexpr int capacity = 10;
+        b2ContactData contact_data[capacity];
 
-        int count = b2Body_GetContactData(id, contact_data.data(), capacity);
+        int count = b2Body_GetContactData(id, contact_data, capacity);
         std::vector<b2BodyId> contacts;
         for (int i = 0; i < count; i++)
         {
@@ -478,10 +494,10 @@ public:
      */
     std::vector<b2BodyId> get_sensor_overlaps()
     {
-        int shape_capacity = b2Body_GetShapeCount(id);
-        std::vector<b2ShapeId> shapes;
-        shapes.reserve(shape_capacity);
-        int shape_count = b2Body_GetShapes(id, shapes.data(), shape_capacity);
+        // Choose 10 as an arbitrary max number of shapes on the body.
+        constexpr int shape_capacity = 10;
+        b2ShapeId shapes[shape_capacity];
+        int shape_count = b2Body_GetShapes(id, shapes, shape_capacity);
 
         std::vector<b2BodyId> contacts;
         for (int i = 0; i < shape_count; i++)
@@ -489,18 +505,20 @@ public:
             auto shape = shapes[i];
             if (b2Shape_IsSensor(shape))
             {
-                int contact_capacity = b2Shape_GetContactCapacity(shape);
-                std::vector<b2ContactData> contact_data;
-                contact_data.reserve(contact_capacity);
-                int contact_count = b2Shape_GetContactData(shape, contact_data.data(), contact_capacity);
+                // Choose 10 as an arbitrary max number of contacts on the sensor shape.
+                constexpr int shape_capacity = 10;
+                b2ShapeId shapes[shape_capacity];
+                int shape_count = b2Shape_GetSensorOverlaps(shape, shapes, shape_capacity);
 
-                for (int j = 0; j < contact_count; j++)
+                for (int j = 0; j < shape_count; j++)
                 {
-                    auto contact = contact_data[j];
-                    auto body_a = b2Shape_GetBody(contact.shapeIdA);
-                    auto body_b = b2Shape_GetBody(contact.shapeIdB);
-                    auto body = body_a == id ? body_b : body_a;
-                    contacts.push_back(body);
+                    auto shape = shapes[j];
+                    auto body = b2Shape_GetBody(shape);
+                    // Check if body is already in contacts to avoid duplicates.
+                    if (std::find(contacts.begin(), contacts.end(), body) == contacts.end())
+                    {
+                        contacts.push_back(body);
+                    }
                 }
             }
         }

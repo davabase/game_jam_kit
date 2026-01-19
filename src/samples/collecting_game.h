@@ -22,6 +22,7 @@ public:
     MultiComponent<SoundComponent>* sounds;
     SoundComponent* jump_sound;
     SoundComponent* die_sound;
+    int score = 0;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -72,8 +73,8 @@ public:
                 box_shape_def.density = p.density;
                 box_shape_def.material = body_material;
 
-                // Needed to presolve one-way behavior.
-                box_shape_def.enablePreSolveEvents = true;
+                // Needed to get sensor events.
+                box_shape_def.enableSensorEvents = true;
 
                 // We use a rounded box which helps with getting stuck on edges.
                 b2Polygon body_polygon = b2MakeRoundedBox(physics->convert_to_meters(p.width / 2.0f),
@@ -179,12 +180,85 @@ public:
 };
 
 /**
+ * A collectible coin.
+ */
+class Coin : public GameObject
+{
+public:
+    Vector2 position;
+    PhysicsService* physics;
+    BodyComponent* body;
+    AnimationController* animation;
+    SoundComponent* collect_sound;
+
+    Coin(Vector2 position) : position(position) {}
+    void init() override
+    {
+        physics = scene->get_service<PhysicsService>();
+
+        body = add_component<BodyComponent>(
+            [=](BodyComponent& b)
+            {
+                b2BodyDef body_def = b2DefaultBodyDef();
+                body_def.type = b2_staticBody;
+                body_def.position = physics->convert_to_meters(position);
+                body_def.userData = this;
+                b.id = b2CreateBody(physics->world, &body_def);
+
+                b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
+
+                b2ShapeDef circle_shape_def = b2DefaultShapeDef();
+                circle_shape_def.density = 1.0f;
+                circle_shape_def.material = body_material;
+                circle_shape_def.isSensor = true;
+                circle_shape_def.enableSensorEvents = true;
+
+                b2Circle circle_shape = {b2Vec2_zero, physics->convert_to_meters(8.0f)};
+                b2CreateCircleShape(b.id, &circle_shape_def, &circle_shape);
+            });
+
+        animation = add_component<AnimationController>(body);
+        animation->add_animation("spin",
+                                 std::vector<std::string>{"assets/pixel_platformer/items/coin_1.png",
+                                                          "assets/pixel_platformer/items/coin_2.png"},
+                                 5.0f);
+        animation->play("spin");
+
+        collect_sound = add_component<SoundComponent>("assets/sounds/coin.wav");
+    }
+
+    void update(float delta_time) override
+    {
+        auto sensor_contacts = body->get_sensor_overlaps();
+        for (auto contact_body_id : sensor_contacts)
+        {
+            auto user_data = static_cast<GameObject*>(b2Body_GetUserData(contact_body_id));
+            if (user_data && user_data->has_tag("character"))
+            {
+                // Collected by character.
+                collect_sound->play();
+
+                // Disable the coin.
+                is_active = false;
+                body->disable();
+
+                // Increase the score on the character.
+                CollectingCharacter* character = static_cast<CollectingCharacter*>(user_data);
+                character->score += 1;
+                break;
+            }
+        }
+    }
+};
+
+/**
  * A collecting game scene.
  */
 class CollectingScene : public Scene
 {
 public:
     WindowManager* window_manager;
+    FontManager* font_manager;
     std::vector<std::shared_ptr<CollectingCharacter>> characters;
     LevelService* level;
     PhysicsService* physics;
@@ -207,6 +281,7 @@ public:
     void init() override
     {
         window_manager = game->get_manager<WindowManager>();
+        font_manager = game->get_manager<FontManager>();
 
         // Create player characters at the "Start" entities.
         auto player_entities = level->get_entities_by_name("Start");
@@ -221,6 +296,15 @@ public:
             auto character = add_game_object<CollectingCharacter>(params, i + 1);
             character->add_tag("character");
             characters.push_back(character);
+        }
+
+        // Create coins at the "Coin" entities.
+        auto coin_entities = level->get_entities_by_name("Coin");
+        for (auto& coin_entity : coin_entities)
+        {
+            Vector2 coin_position = level->convert_to_pixels(coin_entity->getPosition());
+            auto coin = add_game_object<Coin>(coin_position);
+            coin->add_tag("coin");
         }
 
         // Setup cameras.
@@ -269,8 +353,8 @@ public:
         {
             camera->draw_begin();
             Scene::draw_scene();
-            physics->draw_debug();
-            camera->draw_debug();
+            // physics->draw_debug();
+            // camera->draw_debug();
             camera->draw_end();
         }
 
@@ -283,14 +367,32 @@ public:
             if (i == 0)
             {
                 cameras[i]->draw_texture_pro(0, 0, screen_size.x / 2.0f, screen_size.y / 2.0f);
+                DrawTextEx(font_manager->get_font("Tiny5"),
+                           TextFormat("Score: %d", characters[0]->score),
+                           Vector2{20.0f, 20.0f},
+                           40.0f,
+                           2.0f,
+                           BLACK);
             }
             else if (i == 1)
             {
                 cameras[i]->draw_texture_pro(screen_size.x / 2.0f, 0, screen_size.x / 2.0f, screen_size.y / 2.0f);
+                DrawTextEx(font_manager->get_font("Tiny5"),
+                           TextFormat("Score: %d", characters[1]->score),
+                           Vector2{screen_size.x / 2.0f + 20.0f, 20.0f},
+                           40.0f,
+                           2.0f,
+                           BLACK);
             }
             else if (i == 2)
             {
                 cameras[i]->draw_texture_pro(0, screen_size.y / 2.0f, screen_size.x / 2.0f, screen_size.y / 2.0f);
+                DrawTextEx(font_manager->get_font("Tiny5"),
+                           TextFormat("Score: %d", characters[2]->score),
+                           Vector2{20.0f, screen_size.y / 2.0f + 20.0f},
+                           40.0f,
+                           2.0f,
+                           BLACK);
             }
             else if (i == 3)
             {
@@ -298,6 +400,12 @@ public:
                                              screen_size.y / 2.0f,
                                              screen_size.x / 2.0f,
                                              screen_size.y / 2.0f);
+                DrawTextEx(font_manager->get_font("Tiny5"),
+                           TextFormat("Score: %d", characters[3]->score),
+                           Vector2{screen_size.x / 2.0f + 20.0f, screen_size.y / 2.0f + 20.0f},
+                           40.0f,
+                           2.0f,
+                           BLACK);
             }
         }
 
