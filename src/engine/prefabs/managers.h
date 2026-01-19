@@ -160,6 +160,9 @@ public:
         InitWindow(width, height, title.c_str());
         InitAudioDevice();
         SetTargetFPS(target_fps);
+
+        char* mappings = LoadFileText("assets/gamecontrollerdb.txt");
+        SetGamepadMappings(mappings);
         Manager::init();
     }
 
