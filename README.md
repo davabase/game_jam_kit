@@ -42,12 +42,13 @@ brew install xmake
 ```
 
 ## Linux prerequisites
-Install `xmake`, `cmake`, and opengl libs:
+Install `xmake`, `cmake`, opengl libs, and x11 libs:
 ```bash
 sudo apt-get install xmake
 sudo apt-get install g++
 sudo apt-get install cmake
 sudo apt-get install libgl1-mesa-dev
+sudo apt-get install xorg-dev libx11-dev libxfixes-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 ```
 
 ## Build
