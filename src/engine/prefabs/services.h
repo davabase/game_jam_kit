@@ -938,6 +938,18 @@ public:
     }
 
     /**
+     * Get a layer by its name.
+     *
+     * @param name The name of the layer.
+     * @return A reference to the LDtk layer.
+     */
+    const ldtk::Layer& get_layer_by_name(const std::string& name)
+    {
+        const auto& level = get_level();
+        return level.getLayer(name);
+    }
+
+    /**
      * Get all entities across all layers in the level.
      *
      * @return A vector of LDtk entities.
@@ -1075,6 +1087,18 @@ public:
     Vector2 convert_to_pixels(const ldtk::IntPoint& point) const
     {
         return {point.x * scale, point.y * scale};
+    }
+
+    /**
+     * Convert a cell point to pixels.
+     *
+     * @param cell_point The cell point to convert.
+     * @param layer The LDtk layer the cell point is in.
+     */
+    Vector2 convert_cells_to_pixels(const ldtk::IntPoint& cell_point, const ldtk::Layer& layer) const
+    {
+        float cell_size = static_cast<float>(layer.getCellSize());
+        return {cell_point.x * cell_size * scale, cell_point.y * cell_size * scale};
     }
 
     /**

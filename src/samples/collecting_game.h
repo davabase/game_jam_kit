@@ -167,15 +167,131 @@ public:
         {
             animation->pause();
         }
+    }
 
-        // Death and respawn logic.
-        if (body->get_position_pixels().y > level->get_size().y + 200.0f)
+    void die()
+    {
+        // Re-spawn at start position.
+        body->set_position(p.position);
+        body->set_velocity(Vector2{0.0f, 0.0f});
+        die_sound->play();
+    }
+};
+
+enum EnemyType
+{
+    Bat,
+    DrillHead,
+    BlockHead
+};
+
+/**
+ * An enemy.
+ */
+class Enemy : public GameObject
+{
+public:
+    Vector2 start;
+    Vector2 end;
+    PhysicsService* physics;
+    BodyComponent* body;
+    AnimationController* animation;
+    EnemyType type;
+    float radius = 12.0f;
+
+    Enemy(EnemyType type, Vector2 start, Vector2 end) : type(type), start(start), end(end) {}
+    void init_object() override
+    {
+        physics = scene->get_service<PhysicsService>();
+
+        body = add_component<BodyComponent>(
+            [=](BodyComponent& b)
+            {
+                b2BodyDef body_def = b2DefaultBodyDef();
+                body_def.type = b2_kinematicBody;
+                body_def.position = physics->convert_to_meters(start);
+                body_def.userData = this;
+                b.id = b2CreateBody(physics->world, &body_def);
+
+                b2SurfaceMaterial body_material = b2DefaultSurfaceMaterial();
+
+                b2ShapeDef circle_shape_def = b2DefaultShapeDef();
+                circle_shape_def.density = 1.0f;
+                circle_shape_def.material = body_material;
+                circle_shape_def.isSensor = true;
+                circle_shape_def.enableSensorEvents = true;
+
+                b2Circle circle_shape = {b2Vec2_zero, physics->convert_to_meters(radius)};
+                b2CreateCircleShape(b.id, &circle_shape_def, &circle_shape);
+            });
+
+        animation = add_component<AnimationController>(body);
+        if (type == Bat)
         {
-            // Re-spawn at start position.
-            body->set_position(p.position);
-            body->set_velocity(Vector2{0.0f, 0.0f});
-            die_sound->play();
+            animation->add_animation("move",
+                                     std::vector<std::string>{"assets/pixel_platformer/enemies/bat_1.png",
+                                                              "assets/pixel_platformer/enemies/bat_2.png",
+                                                              "assets/pixel_platformer/enemies/bat_3.png"},
+                                     5.0f);
         }
+        else if (type == DrillHead)
+        {
+            animation->add_animation("move",
+                                     std::vector<std::string>{"assets/pixel_platformer/enemies/drill_head_1.png",
+                                                              "assets/pixel_platformer/enemies/drill_head_2.png"},
+                                     5.0f);
+        }
+        else if (type == BlockHead)
+        {
+            animation->add_animation("move",
+                                     std::vector<std::string>{"assets/pixel_platformer/enemies/block_head_1.png",
+                                                              "assets/pixel_platformer/enemies/block_head_2.png"},
+                                     5.0f);
+        }
+        animation->play("move");
+
+        GameObject::init_object();
+
+        // Start moving towards end position.
+        Vector2 to_end = end - body->get_position_pixels();
+        to_end = Vector2Normalize(to_end);
+        body->set_velocity(to_end * 50.0f);
+    }
+
+    void update(float delta_time) override
+    {
+        b2Circle circle_shape = {body->get_position_meters(), physics->convert_to_meters(radius * 2.0f)};
+        if (b2PointInCircle(physics->convert_to_meters(end), &circle_shape))
+        {
+            // Move towards start position.
+            Vector2 to_start = start - body->get_position_pixels();
+            to_start = Vector2Normalize(to_start);
+            body->set_velocity(to_start * 50.0f);
+        }
+        else if (b2PointInCircle(physics->convert_to_meters(start), &circle_shape))
+        {
+            // Move towards end position.
+            Vector2 to_end = end - body->get_position_pixels();
+            to_end = Vector2Normalize(to_end);
+            body->set_velocity(to_end * 50.0f);
+        }
+
+        // Check for collisions.
+        auto sensor_contacts = body->get_sensor_overlaps();
+        for (auto contact_body_id : sensor_contacts)
+        {
+            auto user_data = static_cast<GameObject*>(b2Body_GetUserData(contact_body_id));
+            if (user_data && user_data->has_tag("character"))
+            {
+                // Hit player.
+                CollectingCharacter* character = static_cast<CollectingCharacter*>(user_data);
+                character->die();
+            }
+        }
+
+        // Flip based on velocity.
+        Vector2 velocity = body->get_velocity_pixels();
+        animation->flip_x = velocity.x > 0.0f;
     }
 };
 
@@ -264,6 +380,7 @@ public:
     PhysicsService* physics;
     std::vector<std::shared_ptr<SplitCamera>> cameras;
     Vector2 screen_size;
+    float scale = 2.5f;
 
     void init_services() override
     {
@@ -283,6 +400,8 @@ public:
         window_manager = game->get_manager<WindowManager>();
         font_manager = game->get_manager<FontManager>();
 
+        const auto& entities_layer = level->get_layer_by_name("Entities");
+
         // Create player characters at the "Start" entities.
         auto player_entities = level->get_entities_by_name("Start");
 
@@ -296,6 +415,42 @@ public:
             auto character = add_game_object<CollectingCharacter>(params, i + 1);
             character->add_tag("character");
             characters.push_back(character);
+        }
+
+        // Create enemies at the each enemy entity.
+        auto bat_entities = level->get_entities_by_name("Bat");
+        for (auto& bat_entity : bat_entities)
+        {
+            auto start_point = bat_entity->getPosition();
+            Vector2 start_position = level->convert_to_pixels(start_point);
+            ldtk::IntPoint end_point = bat_entity->getField<ldtk::IntPoint>("end").value();
+            // Annoyingly, Point fields in LDtk are in cell coordinates rather than pixel coordinates, and the cell
+            // size is dependent on the layer.
+            Vector2 end_position = level->convert_cells_to_pixels(end_point, entities_layer);
+            auto enemy = add_game_object<Enemy>(EnemyType::Bat, start_position, end_position);
+            enemy->add_tag("enemy");
+        }
+
+        auto drill_entities = level->get_entities_by_name("DrillHead");
+        for (auto& drill_entity : drill_entities)
+        {
+            auto start_point = drill_entity->getPosition();
+            Vector2 start_position = level->convert_to_pixels(start_point);
+            ldtk::IntPoint end_point = drill_entity->getField<ldtk::IntPoint>("end").value();
+            Vector2 end_position = level->convert_cells_to_pixels(end_point, entities_layer);
+            auto enemy = add_game_object<Enemy>(EnemyType::DrillHead, start_position, end_position);
+            enemy->add_tag("enemy");
+        }
+
+        auto block_entities = level->get_entities_by_name("BlockHead");
+        for (auto& block_entity : block_entities)
+        {
+            auto start_point = block_entity->getPosition();
+            Vector2 start_position = level->convert_to_pixels(start_point);
+            ldtk::IntPoint end_point = block_entity->getField<ldtk::IntPoint>("end").value();
+            Vector2 end_position = level->convert_cells_to_pixels(end_point, entities_layer);
+            auto enemy = add_game_object<Enemy>(EnemyType::BlockHead, start_position, end_position);
+            enemy->add_tag("enemy");
         }
 
         // Create coins at the "Coin" entities.
@@ -312,7 +467,7 @@ public:
             Vector2{static_cast<float>(window_manager->get_width()), static_cast<float>(window_manager->get_height())};
         for (int i = 0; i < characters.size(); i++)
         {
-            auto cam = add_game_object<SplitCamera>(screen_size / 2.0f, level->get_size());
+            auto cam = add_game_object<SplitCamera>(screen_size / scale, level->get_size());
             cameras.push_back(cam);
         }
     }
@@ -331,10 +486,10 @@ public:
             // Window resized, update cameras.
             screen_size = new_screen_size;
             // Scale the cameras so they are zoomed in when drawn.
-            float scale = window_manager->get_width() / screen_size.x;
+            float screen_scale = window_manager->get_width() / screen_size.x;
             for (auto camera : cameras)
             {
-                camera->size = screen_size / 2.0f * scale;
+                camera->size = screen_size / scale * screen_scale;
                 camera->camera.offset = {camera->size.x / 2.0f, camera->size.y / 2.0f};
                 UnloadRenderTexture(camera->renderer);
                 camera->renderer = LoadRenderTexture((int)camera->size.x, (int)camera->size.y);

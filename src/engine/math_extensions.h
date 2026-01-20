@@ -60,6 +60,16 @@ inline Vector2 operator/(Vector2 a, float b)
     return {a.x / b, a.y / b};
 }
 
+inline Vector2 Vector2Normalize(Vector2 v)
+{
+    float length = sqrtf(v.x * v.x + v.y * v.y);
+    if (length != 0.0f)
+    {
+        return {v.x / length, v.y / length};
+    }
+    return {0.0f, 0.0f};
+}
+
 /// Binary vector equality
 inline bool operator==(Vector2 a, Vector2 b)
 {
