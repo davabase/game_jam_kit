@@ -1304,16 +1304,12 @@ public:
 
         // Build desired movement input vector.
         Vector2 input = {move_x, move_y};
-        float input_len = std::sqrt(input.x * input.x + input.y * input.y);
+        float input_len_sq = input.x * input.x + input.y * input.y;
 
         Vector2 desired_vel = {0.0f, 0.0f};
 
-        if (input_len > 0.0f)
+        if (input_len_sq > 0.0f)
         {
-            // Normalize input and scale to max speed.
-            input.x /= input_len;
-            input.y /= input_len;
-
             desired_vel.x = input.x * p.max_speed;
             desired_vel.y = input.y * p.max_speed;
 
@@ -1322,8 +1318,6 @@ public:
 
             // Accelerate towards desired velocity.
             v = move_towards_vec(v, desired_vel, p.accel * delta_time);
-            // TODO: Fix this.
-            v = input * p.max_speed;
         }
         else
         {

@@ -136,8 +136,8 @@ public:
 
         // Setup movement.
         TopDownMovementParams mp;
-        mp.accel = 10000000.0f;
-        mp.friction = 10000000.0f;
+        mp.accel = 5000.0f;
+        mp.friction = 5000.0f;
         mp.max_speed = 350.0f;
         movement = add_component<TopDownMovementComponent>(mp);
 
@@ -459,7 +459,7 @@ public:
         ClearBackground(MAGENTA);
         Scene::draw_scene();
         level->draw_layer("Foreground");
-        DrawRectangle(10, 10, 210, 210, WHITE);
+        DrawRectangle(10, 10, 210, 210, Fade(WHITE, 0.3f));
         DrawTextEx(font_manager->get_font("Roboto"),
                    TextFormat("Health: %d\nHealth: %d\nHealth: %d\nHealth: %d",
                               characters[0]->health,
