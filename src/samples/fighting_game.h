@@ -19,7 +19,7 @@ public:
     PhysicsService* physics;
     LevelService* level;
     BodyComponent* body;
-    MovementComponent* movement;
+    PlatformerMovementComponent* movement;
     AnimationController* animation;
     MultiComponent<SoundComponent>* sounds;
     SoundComponent* jump_sound;
@@ -89,10 +89,10 @@ public:
                 b2CreatePolygonShape(b.id, &box_shape_def, &body_polygon);
             });
 
-        MovementParams mp;
+        PlatformerMovementParams mp;
         mp.width = p.width;
         mp.height = p.height;
-        movement = add_component<MovementComponent>(mp);
+        movement = add_component<PlatformerMovementComponent>(mp);
 
         level = scene->get_service<LevelService>();
 

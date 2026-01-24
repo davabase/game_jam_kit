@@ -1,5 +1,6 @@
 #include "samples/collecting_game.h"
 #include "samples/fighting_game.h"
+#include "samples/zombie_game.h"
 
 // Emscripten is used for web builds.
 #ifdef __EMSCRIPTEN__
@@ -26,6 +27,7 @@ int main(int argc, char** argv)
     font_manager->load_font("Roboto", "assets/fonts/Roboto.ttf", 64);
     font_manager->load_font("Tiny5", "assets/fonts/Tiny5.ttf", 64);
     font_manager->set_texture_filter("Roboto", TEXTURE_FILTER_BILINEAR);
+    game.add_scene<ZombieScene>("zombie");
     game.add_scene<CollectingScene>("collecting");
     game.add_scene<FightingScene>("fighting");
 

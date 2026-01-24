@@ -405,6 +405,18 @@ public:
     }
 
     /**
+     * Set the rotation of the body in degrees.
+     *
+     * @param degrees The rotation in degrees.
+     */
+    void set_rotation(float degrees)
+    {
+        b2Vec2 position = b2Body_GetPosition(id);
+        b2Rot rotation = b2MakeRot(degrees * DEG2RAD);
+        b2Body_SetTransform(id, position, rotation);
+    }
+
+    /**
      * Get the velocity of the body in meters per second.
      *
      * @return The velocity in meters per second.
@@ -1054,9 +1066,9 @@ public:
 };
 
 /**
- * Parameters for MovementComponent.
+ * Parameters for PlatformerMovementComponent.
  */
-struct MovementParams
+struct PlatformerMovementParams
 {
     float width = 24.0f; // pixels
     float height = 40.0f; // pixels
@@ -1081,10 +1093,10 @@ struct MovementParams
  * A component for 2D platformer movement.
  * Depends on PhysicsService and BodyComponent.
  */
-class MovementComponent : public Component
+class PlatformerMovementComponent : public Component
 {
 public:
-    MovementParams p;
+    PlatformerMovementParams p;
     PhysicsService* physics;
     BodyComponent* body;
 
@@ -1099,11 +1111,11 @@ public:
     bool jump_held = false;
 
     /**
-     * Constructor for MovementComponent.
+     * Constructor for PlatformerMovementComponent.
      *
      * @param p The movement parameters.
      */
-    MovementComponent(MovementParams p) : p(p) {}
+    PlatformerMovementComponent(PlatformerMovementParams p) : p(p) {}
 
     /**
      * Initialize the movement component.
@@ -1240,5 +1252,145 @@ public:
         move_x = horizontal_speed;
         this->jump_pressed = jump_pressed;
         this->jump_held = jump_held;
+    }
+};
+
+struct TopDownMovementParams
+{
+    float max_speed = 300.0f; // max speed in px/s
+    float accel = 1200.0f; // accel when holding input
+    float friction = 1200.0f; // decel when no input
+};
+
+/**
+ * A component for 2D top-down movement.
+ * Depends on PhysicsService and BodyComponent.
+ *
+ * Movement is controlled by setting a 2D input vector (move_x, move_y),
+ * and this component accelerates/decelerates the body towards a target
+ * velocity using simple acceleration + friction.
+ */
+class TopDownMovementComponent : public Component
+{
+public:
+    TopDownMovementParams p;
+    PhysicsService* physics = nullptr;
+    BodyComponent* body = nullptr;
+
+    // Raw input in [-1, 1] range for each axis.
+    float move_x = 0.0f;
+    float move_y = 0.0f;
+
+    // Store last facing direction for aiming/animation.
+    float facing_dir = 0.0f;
+
+    TopDownMovementComponent(TopDownMovementParams p) : p(p) {}
+
+    void init() override
+    {
+        physics = owner->scene->get_service<PhysicsService>();
+        body = owner->get_component<BodyComponent>();
+    }
+
+    void update(float delta_time) override
+    {
+        if (!b2Body_IsValid(body->id))
+        {
+            return;
+        }
+
+        // Current velocity in pixels/sec (assuming your BodyComponent uses this).
+        Vector2 v = body->get_velocity_pixels();
+
+        // Build desired movement input vector.
+        Vector2 input = {move_x, move_y};
+        float input_len = std::sqrt(input.x * input.x + input.y * input.y);
+
+        Vector2 desired_vel = {0.0f, 0.0f};
+
+        if (input_len > 0.0f)
+        {
+            // Normalize input and scale to max speed.
+            input.x /= input_len;
+            input.y /= input_len;
+
+            desired_vel.x = input.x * p.max_speed;
+            desired_vel.y = input.y * p.max_speed;
+
+            // Update facing direction.
+            facing_dir = atan2f(input.y, input.x) * RAD2DEG;
+
+            // Accelerate towards desired velocity.
+            v = move_towards_vec(v, desired_vel, p.accel * delta_time);
+            // TODO: Fix this.
+            v = input * p.max_speed;
+        }
+        else
+        {
+            // No input: apply friction to slow down.
+            v = apply_friction(v, p.friction * delta_time);
+        }
+
+        // Clamp to max speed just in case.
+        float speed_sq = v.x * v.x + v.y * v.y;
+        float max_speed_sq = p.max_speed * p.max_speed;
+        if (speed_sq > max_speed_sq)
+        {
+            float speed = std::sqrt(speed_sq);
+            float scale = p.max_speed / speed;
+            v.x *= scale;
+            v.y *= scale;
+        }
+
+        body->set_velocity(v);
+    }
+
+    /**
+     * Move a velocity vector towards a target vector by at most max_delta length.
+     */
+    static Vector2 move_towards_vec(const Vector2& current, const Vector2& target, float max_delta)
+    {
+        Vector2 delta = {target.x - current.x, target.y - current.y};
+        float len = std::sqrt(delta.x * delta.x + delta.y * delta.y);
+        if (len <= max_delta || len < 1e-5f)
+        {
+            return target;
+        }
+        float scale = max_delta / len;
+        return Vector2{current.x + delta.x * scale, current.y + delta.y * scale};
+    }
+
+    /**
+     * Apply friction to a velocity vector (reduce its magnitude).
+     * `friction_delta` is how much speed we remove this frame.
+     */
+    static Vector2 apply_friction(const Vector2& v, float friction_delta)
+    {
+        float speed = std::sqrt(v.x * v.x + v.y * v.y);
+        if (speed < 1e-5f)
+        {
+            return Vector2{0.0f, 0.0f};
+        }
+
+        float new_speed = speed - friction_delta;
+        if (new_speed <= 0.0f)
+        {
+            return Vector2{0.0f, 0.0f};
+        }
+
+        float scale = new_speed / speed;
+        return Vector2{v.x * scale, v.y * scale};
+    }
+
+    /**
+     * Set the input for movement.
+     *
+     * @param horizontal Horizontal input (-1.0 to 1.0).
+     * @param vertical   Vertical input   (-1.0 to 1.0).
+     */
+    void set_input(float horizontal, float vertical)
+    {
+        move_x = horizontal;
+        move_y = vertical;
     }
 };

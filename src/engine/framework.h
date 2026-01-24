@@ -16,59 +16,6 @@ class Scene;
 class Game;
 
 /**
- * A simple object pool for reusing game objects.
- */
-template <typename T>
-class ObjectPool
-{
-public:
-    std::vector<std::shared_ptr<T>> objects;
-
-    ObjectPool() = default;
-
-    /**
-     * Constructor that preallocates a number of objects.
-     *
-     * @param initial_size The number of objects to preallocate.
-     */
-    ObjectPool(size_t initial_size)
-    {
-        objects.reserve(initial_size);
-        for (size_t i = 0; i < initial_size; ++i)
-        {
-            objects.push_back(std::make_shared<T>());
-        }
-    }
-
-    /**
-     * Get an object from the pool. If no inactive objects are available, a new one is created.
-     *
-     * @return A shared pointer to the object.
-     */
-    std::shared_ptr<T> get_object()
-    {
-        for (auto& obj : objects)
-        {
-            if (!obj->is_active)
-            {
-                obj->is_active = true;
-                return obj;
-            }
-        }
-        // No inactive objects, create a new one.
-        auto new_obj = std::make_shared<T>();
-        new_obj->is_active = true;
-        objects.push_back(new_obj);
-        return new_obj;
-    }
-
-    void return_object(std::shared_ptr<T> obj)
-    {
-        obj->is_active = false;
-    }
-};
-
-/**
  * The base class for all game object components.
  * Components are added to game objects to provide functionality.
  */

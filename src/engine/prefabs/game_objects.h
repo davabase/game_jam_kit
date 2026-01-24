@@ -519,7 +519,7 @@ public:
     CharacterParams p;
     PhysicsService* physics;
     BodyComponent* body;
-    MovementComponent* movement;
+    PlatformerMovementComponent* movement;
 
     bool grounded = false;
     bool on_wall_left = false;
@@ -572,10 +572,10 @@ public:
                 b2CreatePolygonShape(b.id, &box_shape_def, &body_polygon);
             });
 
-        MovementParams mp;
+        PlatformerMovementParams mp;
         mp.width = p.width;
         mp.height = p.height;
-        movement = add_component<MovementComponent>(mp);
+        movement = add_component<PlatformerMovementComponent>(mp);
     }
 
     /**
