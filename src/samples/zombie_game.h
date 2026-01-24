@@ -1,9 +1,22 @@
+/**
+ * Demonstration of a top down shooter game.
+ * Shows how to draw lights using custom blend modes.
+ */
+
 #pragma once
 
 #include "engine/prefabs/includes.h"
+#include "rlgl.h"
+
+// Custom Blend Modes for lights. See https://www.raylib.com/examples/shapes/loader.html?name=shapes_top_down_lights
+#define RLGL_SRC_ALPHA 0x0302
+#define RLGL_MIN 0x8007
 
 class ZombieScene;
 
+/**
+ * A bullet fired by a character.
+ */
 class Bullet : public GameObject
 {
 public:
@@ -84,6 +97,9 @@ public:
     }
 };
 
+/**
+ * A top-down character controlled by the player.
+ */
 class TopDownCharacter : public GameObject
 {
 public:
@@ -175,16 +191,6 @@ public:
             move.x += 1.0f;
         }
 
-        // Deadzone.
-        if (fabs(move.x) < 0.1f)
-        {
-            move.x = 0.0f;
-        }
-        if (fabs(move.y) < 0.1f)
-        {
-            move.y = 0.0f;
-        }
-
         movement->set_input(move.x, move.y);
 
         // Update sprite position and rotation.
@@ -253,6 +259,9 @@ public:
     }
 };
 
+/**
+ * A zombie that chases the closest player.
+ */
 class Zombie : public GameObject
 {
 public:
@@ -333,6 +342,9 @@ public:
     }
 };
 
+/**
+ * A spawner that spawns zombies at intervals.
+ */
 class Spawner : public GameObject
 {
 public:
@@ -374,6 +386,9 @@ public:
     }
 };
 
+/**
+ * A scene for the zombie shooter game.
+ */
 class ZombieScene : public Scene
 {
 public:
@@ -381,6 +396,8 @@ public:
     PhysicsService* physics;
     LevelService* level;
     RenderTexture2D renderer;
+    RenderTexture2D light_map;
+    Texture2D light_texture;
     std::vector<std::shared_ptr<Bullet>> bullets;
     std::vector<std::shared_ptr<TopDownCharacter>> characters;
     std::vector<std::shared_ptr<Zombie>> zombies;
@@ -400,7 +417,6 @@ public:
         font_manager = game->get_manager<FontManager>();
     }
 
-    // TODO: Add lights?
     void init() override
     {
         const auto& entities_layer = level->get_layer_by_name("Entities");
@@ -450,15 +466,53 @@ public:
 
         // Create render texture to scale the level to the screen.
         renderer = LoadRenderTexture((int)level->get_size().x, (int)level->get_size().y);
+        light_map = LoadRenderTexture((int)level->get_size().x, (int)level->get_size().y);
+
+        light_texture = get_service<TextureService>()->get_texture("assets/zombie_shooter/light.png");
     }
 
     void draw_scene() override
     {
+        // Build up the light mask
+        BeginTextureMode(light_map);
+        ClearBackground(BLACK);
+
+        // Force the blend mode to only set the alpha of the destination
+        rlSetBlendFactors(RLGL_SRC_ALPHA, RLGL_SRC_ALPHA, RLGL_MIN);
+        rlSetBlendMode(BLEND_CUSTOM);
+
+        // Merge in all the light masks
+        for (int i = 0; i < 4; i++)
+        {
+            // DrawCircleGradient((int)characters[i]->body->get_position_pixels().x,
+            //                    (int)characters[i]->body->get_position_pixels().y,
+            //                    300.0f,
+            //                    ColorAlpha(WHITE, 0),
+            //                    ColorAlpha(BLACK, 1));
+            DrawTexture(light_texture,
+                        (int)(characters[i]->body->get_position_pixels().x - light_texture.width / 2),
+                        (int)(characters[i]->body->get_position_pixels().y - light_texture.height / 2),
+                        WHITE);
+        }
+
+        rlDrawRenderBatchActive();
+
+        // Go back to normal blend
+        rlSetBlendMode(BLEND_ALPHA);
+        EndTextureMode();
+
         // Draw to render texture first.
         BeginTextureMode(renderer);
         ClearBackground(MAGENTA);
         Scene::draw_scene();
         level->draw_layer("Foreground");
+        DrawTexturePro(
+            light_map.texture,
+            {0.0f, 0.0f, static_cast<float>(light_map.texture.width), static_cast<float>(-light_map.texture.height)},
+            {0.0f, 0.0f, static_cast<float>(light_map.texture.width), static_cast<float>(light_map.texture.height)},
+            {0.0f, 0.0f},
+            0.0f,
+            ColorAlpha(WHITE, 0.95f));
         DrawRectangle(10, 10, 210, 210, Fade(WHITE, 0.3f));
         DrawTextEx(font_manager->get_font("Roboto"),
                    TextFormat("Health: %d\nHealth: %d\nHealth: %d\nHealth: %d",

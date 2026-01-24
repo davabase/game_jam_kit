@@ -1260,6 +1260,7 @@ struct TopDownMovementParams
     float max_speed = 300.0f; // max speed in px/s
     float accel = 1200.0f; // accel when holding input
     float friction = 1200.0f; // decel when no input
+    float deadzone = 0.1f; // input deadzone
 };
 
 /**
@@ -1308,7 +1309,8 @@ public:
 
         Vector2 desired_vel = {0.0f, 0.0f};
 
-        if (input_len_sq > 0.0f)
+        // Deadzone.
+        if (input_len_sq > p.deadzone * p.deadzone)
         {
             desired_vel.x = input.x * p.max_speed;
             desired_vel.y = input.y * p.max_speed;
