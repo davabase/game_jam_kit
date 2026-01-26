@@ -84,6 +84,7 @@ public:
                     {
                         zombie_body->set_position(Vector2{-1000.0f, -1000.0f});
                         zombie_body->set_velocity(Vector2{0.0f, 0.0f});
+                        zombie_body->disable();
                     }
                     auto zombie_sprite = other->get_component<SpriteComponent>();
                     if (zombie_sprite)
@@ -114,7 +115,7 @@ public:
     int player_num = 0;
     int health = 10;
     float contact_timer = 1.0f;
-    float contact_cooldown = 0.5f;
+    float contact_cooldown = 0.3f;
 
     TopDownCharacter(Vector2 position, std::vector<std::shared_ptr<Bullet>> bullets, int player_num = 0) :
         position(position),
@@ -235,7 +236,7 @@ public:
             {
                 if (other->has_tag("zombie"))
                 {
-                    // For every half second we are in contact with a zombie, take 1 damage.
+                    // When we are in contact with a zombie long enough, take 1 damage.
                     if (contact_timer > 0.0f)
                     {
                         contact_timer -= delta_time;
@@ -296,6 +297,8 @@ public:
 
                 b2Circle circle_shape = {b2Vec2_zero, physics->convert_to_meters(16.0f)};
                 b2CreateCircleShape(b.id, &circle_shape_def, &circle_shape);
+                // Disable by default.
+                b2Body_Disable(b.id);
             });
 
         // Setup movement.
@@ -349,7 +352,7 @@ class Spawner : public GameObject
 {
 public:
     float spawn_timer = 0.0f;
-    float spawn_interval = 2.0f; // Spawn a zombie every 2 seconds
+    float spawn_interval = 1.0f; // Spawn a zombie every 1 second
     std::vector<std::shared_ptr<Zombie>> zombie_pool;
     Vector2 position = {0, 0};
     Vector2 size = {0, 0};
@@ -379,6 +382,7 @@ public:
                 {
                     zombie->body->set_position(spawn_pos);
                     zombie->is_active = true;
+                    zombie->body->enable();
                     return;
                 }
             }
@@ -445,7 +449,7 @@ public:
 
         // Prepare a pool of zombies.
         // It is unwise to call init during update loops, so we create all zombies here and deactivate them.
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 100; i++)
         {
             // Start off-screen
             auto zombie = add_game_object<Zombie>(characters);
@@ -512,7 +516,7 @@ public:
             {0.0f, 0.0f, static_cast<float>(light_map.texture.width), static_cast<float>(light_map.texture.height)},
             {0.0f, 0.0f},
             0.0f,
-            ColorAlpha(WHITE, 0.95f));
+            ColorAlpha(WHITE, 0.92f));
         DrawRectangle(10, 10, 210, 210, Fade(WHITE, 0.3f));
         DrawTextEx(font_manager->get_font("Roboto"),
                    TextFormat("Health: %d\nHealth: %d\nHealth: %d\nHealth: %d",
