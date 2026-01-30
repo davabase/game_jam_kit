@@ -475,6 +475,15 @@ public:
         light_texture = get_service<TextureService>()->get_texture("assets/zombie_shooter/light.png");
     }
 
+    void update(float delta_time) override
+    {
+        // Trigger scene change on Enter key or gamepad start button.
+        if (IsKeyPressed(KEY_ENTER) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT))
+        {
+            game->go_to_scene_next();
+        }
+    }
+
     void draw_scene() override
     {
         // Build up the light mask

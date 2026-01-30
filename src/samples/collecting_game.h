@@ -495,6 +495,12 @@ public:
                 camera->renderer = LoadRenderTexture((int)camera->size.x, (int)camera->size.y);
             }
         }
+
+        // Trigger scene change on Enter key or gamepad start button.
+        if (IsKeyPressed(KEY_ENTER) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT))
+        {
+            game->go_to_scene_next();
+        }
     }
 
     /**

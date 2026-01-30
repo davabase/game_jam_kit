@@ -496,6 +496,12 @@ public:
         Vector2 render_size = {level->get_size().y * render_scale * aspect_ratio, level->get_size().y * render_scale};
         auto pos = (Vector2{(float)GetScreenWidth(), (float)GetScreenHeight()} - render_size) / 2.0f;
         render_rect = Rectangle{pos.x, pos.y, render_size.x, render_size.y};
+
+        // Trigger scene change on Enter key or gamepad start button.
+        if (IsKeyPressed(KEY_ENTER) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT))
+        {
+            game->go_to_scene_next();
+        }
     }
 
     /**

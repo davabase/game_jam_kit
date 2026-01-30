@@ -35,6 +35,12 @@ This project uses [xmake](https://xmake.io/) to build. Checkout `xmake.lua` for 
 
 Using the [xmake extension](https://marketplace.visualstudio.com/items?itemName=tboox.xmake-vscode) for VS Code is highly recommended.
 
+## Windows prerequisites
+Install [Visual Studio Community Edition](https://visualstudio.microsoft.com/vs/community/), anything 2022 and over should be fine.
+Make sure to install the C++ packages.
+Install [xmake](https://xmake.io/guide/quick-start.html).
+
+
 ## Mac prerequisites
 Install `xmake`:
 ```bash
