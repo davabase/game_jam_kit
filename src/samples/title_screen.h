@@ -6,7 +6,7 @@ class TitleScreen : public Scene
 {
 public:
     Font font;
-    std::string title = "Game Jam";
+    std::string title = "Game Jam Kit";
     void init() override
     {
         auto font_manager = game->get_manager<FontManager>();
